@@ -4,6 +4,7 @@ metadata:
   name: minio-pvc
   namespace: icx-portal
 spec:
+  storageClassName: nfs-csi
   accessModes: [ReadWriteOnce]
   resources:
     requests:
