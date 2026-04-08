@@ -6,9 +6,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/YOUR_GITHUB_USERNAME/icx-portal-manifests   # your manifest repo
+    repoURL: https://github.com/Infinia-Technology/ICX-PORTAL
     targetRevision: main
-    path: k8s/overlays/prod
+    path: icx-portal/k8s/overlays/prod
   destination:
     server: https://kubernetes.default.svc   # prod cluster (in-cluster)
     namespace: icx-portal
