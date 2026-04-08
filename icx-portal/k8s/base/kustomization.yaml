@@ -8,3 +8,4 @@ resources:
   - minio.yaml
   - server.yaml
   - client.yaml
+  - ingress.yaml

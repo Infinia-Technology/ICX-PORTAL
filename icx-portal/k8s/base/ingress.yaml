@@ -1,0 +1,43 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: icx-portal-ingress
+  namespace: icx-portal
+  annotations:
+    # Allow file uploads up to 10MB (matches MAX_FILE_SIZE_MB)
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+
+    # Match server timeout for long-running requests
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
+
+    # Forward real client IP to the server (fixes express-rate-limit behind proxy)
+    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
+    nginx.ingress.kubernetes.io/forwarded-for-header: "X-Forwarded-For"
+
+    # Redirect HTTP → HTTPS
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+
+    # TLS certificate — issued automatically by cert-manager
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - YOUR_DOMAIN   # e.g. portal.iamsaif.ai
+      secretName: icx-portal-tls   # cert-manager stores the cert here
+  rules:
+    - host: YOUR_DOMAIN
+      http:
+        paths:
+          # All traffic → nginx container in client pod
+          # nginx container handles: static files + /api/ proxy to server:5000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: client
+                port:
+                  number: 80
