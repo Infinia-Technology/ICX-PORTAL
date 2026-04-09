@@ -100,6 +100,8 @@ async function seed() {
     { email: SEED_EMAILS.viewer, role: 'viewer' },
     { email: SEED_EMAILS.subordinate, role: 'subordinate', organizationId: supplierOrg._id },
     { email: SEED_EMAILS.pending, role: resolveRole(pendingSupplierOrg.vendorType), organizationId: pendingSupplierOrg._id },
+
+
   ]);
   console.log(`Created ${users.length} users`);
 
