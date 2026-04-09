@@ -5,16 +5,11 @@ metadata:
   namespace: icx-portal
   annotations:
     kubernetes.io/ingress.class: nginx
-    # Use regex so /api/.* reliably routes to server and never falls through to client
-    nginx.ingress.kubernetes.io/use-regex: "true"
-    # Allow file uploads up to 10MB (matches MAX_FILE_SIZE_MB)
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
-    # TLS redirect
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-    # Forward real client IP — fixes express-rate-limit behind proxy
     nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
     nginx.ingress.kubernetes.io/forwarded-for-header: "X-Forwarded-For"
 spec:
@@ -26,17 +21,8 @@ spec:
     - host: icx.iamsaif.ai
       http:
         paths:
-          # All /api/* traffic → Express server (must be listed before / catch-all)
-          - path: /api(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: server
-                port:
-                  number: 5000
-          # Everything else → React SPA
-          - path: /(.*)
-            pathType: ImplementationSpecific
+          - path: /
+            pathType: Prefix
             backend:
               service:
                 name: client
