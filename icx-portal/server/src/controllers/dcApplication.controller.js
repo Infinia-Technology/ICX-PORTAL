@@ -7,15 +7,17 @@ const { createQueueItem, updateQueueStatus } = require('../services/queue.servic
 const { getPresignedPutUrl, getPresignedGetUrl } = require('../services/s3.service');
 const { paginate } = require('../utils/pagination');
 const Notification = require('../models/Notification');
+const { findDuplicateDcListings } = require('../services/duplicate.service');
 
 const SUPPLIER_ROLES = ['supplier', 'broker', 'subordinate'];
 
 // GET /api/dc-applications
 const listApplications = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, status } = req.query;
+    const { page = 1, limit = 20, status, includeArchived = false } = req.query;
     const filter = { organizationId: req.user.organizationId };
     if (status) filter.status = status;
+    if (includeArchived !== 'true') filter.isArchived = false;
 
     const result = await paginate(DcApplication, filter, {
       page: parseInt(page), limit: parseInt(limit), sort: { createdAt: -1 },
@@ -73,7 +75,9 @@ const updateApplication = async (req, res, next) => {
 
     const allowed = ['companyLegalEntity', 'companyOfficeAddress', 'companyCountry', 'contactName', 'contactEmail', 'contactMobile', 'otherDetails', 'brokerDcCompanyId'];
     allowed.forEach((f) => { if (req.body[f] !== undefined) app[f] = req.body[f]; });
+    app.lastActivityAt = new Date();
     await app.save();
+    await logAction({ userId: req.user.userId, action: 'UPDATE_DC_APPLICATION', targetModel: 'DcApplication', targetId: app._id, ipAddress: req.ip });
     res.json(app);
   } catch (err) { next(err); }
 };
@@ -81,11 +85,31 @@ const updateApplication = async (req, res, next) => {
 // POST /api/dc-applications/:id/submit
 const submitApplication = async (req, res, next) => {
   try {
+    const { force = false } = req.body;
     const app = await DcApplication.findOne({ _id: req.params.id, organizationId: req.user.organizationId });
     if (!app) return res.status(404).json({ error: 'Application not found' });
 
     if (!['DRAFT'].includes(app.status)) {
       return res.status(400).json({ error: 'Only draft applications can be submitted' });
+    }
+
+    // Check for duplicates (skip if force=true)
+    if (!force) {
+      const duplicates = await findDuplicateDcListings({
+        organizationId: app.organizationId,
+        location: app.location,
+        googleMapsLink: app.googleMapsLink,
+        companyLegalEntity: app.companyLegalEntity,
+      });
+
+      // If duplicates found, return warning without blocking submission
+      if (duplicates.length > 0) {
+        return res.status(200).json({
+          hasDuplicates: true,
+          duplicates,
+          message: `Found ${duplicates.length} potential duplicate(s). Review before confirming.`,
+        });
+      }
     }
 
     app.status = 'SUBMITTED';
@@ -94,7 +118,7 @@ const submitApplication = async (req, res, next) => {
 
     await createQueueItem({ type: 'DC_LISTING', referenceId: app._id, referenceModel: 'DcApplication' });
     await logAction({ userId: req.user.userId, action: 'SUBMIT_DC_APPLICATION', targetModel: 'DcApplication', targetId: app._id, ipAddress: req.ip });
-    res.json({ message: 'Application submitted for review', status: app.status });
+    res.json({ message: 'Application submitted for review', status: app.status, hasDuplicates: false });
   } catch (err) { next(err); }
 };
 

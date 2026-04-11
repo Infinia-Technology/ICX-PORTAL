@@ -7,8 +7,31 @@ const DcSite = require('../models/DcSite');
 const GpuClusterListing = require('../models/GpuClusterListing');
 const Organization = require('../models/Organization');
 const { logAction } = require('../services/audit.service');
+const reportController = require('../controllers/report.controller');
 
 router.use(authenticate);
+
+// ======================= DYNAMIC REPORTS =======================
+
+// GET /api/reports/templates
+router.get('/templates', reportController.getTemplates);
+
+// POST /api/reports/templates
+router.post('/templates', reportController.createTemplate);
+
+// PUT /api/reports/templates/:id
+router.put('/templates/:id', reportController.updateTemplate);
+
+// DELETE /api/reports/templates/:id
+router.delete('/templates/:id', reportController.deleteTemplate);
+
+// POST /api/reports/generate
+router.post('/generate', reportController.generateReport);
+
+// POST /api/reports/preview
+router.post('/preview', reportController.previewReport);
+
+// ======================= LEGACY SINGLE LISTING REPORTS =======================
 
 // Helper: flatten object to CSV-friendly format
 const flattenObj = (obj, prefix = '') =>

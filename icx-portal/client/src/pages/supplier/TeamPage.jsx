@@ -104,7 +104,7 @@ export default function TeamPage() {
         </div>
       )}
 
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Invite Team Member">
+      <Modal open={showModal} onClose={() => setShowModal(false)} title="Invite Team Member">
         <div className="space-y-4">
           <Input label="Email Address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="colleague@company.com" />
           <div>

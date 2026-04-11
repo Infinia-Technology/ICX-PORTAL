@@ -4,10 +4,14 @@ const { paginate } = require('../utils/pagination');
 // GET /api/notifications
 const getNotifications = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20 } = req.query;
+    const { page = 1, limit = 20, type, unreadOnly = false } = req.query;
+    const filter = { userId: req.user.userId };
+    if (type) filter.type = type;
+    if (unreadOnly === 'true') filter.read = false;
+
     const result = await paginate(
       Notification,
-      { userId: req.user.userId },
+      filter,
       { page: parseInt(page), limit: parseInt(limit), sort: { createdAt: -1 } }
     );
     res.json(result);
