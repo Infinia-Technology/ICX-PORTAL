@@ -29,6 +29,19 @@ export const LISTING_STATUS = {
   REJECTED: 'REJECTED',
 };
 
+export const INVENTORY_STATUS = {
+  AVAILABLE: 'AVAILABLE',
+  RESERVED: 'RESERVED',
+  SOLD: 'SOLD',
+  ARCHIVED: 'ARCHIVED',
+};
+
+export const RESERVATION_STATUS = {
+  ACTIVE: 'ACTIVE',
+  EXPIRED: 'EXPIRED',
+  CANCELLED: 'CANCELLED',
+};
+
 export const VENDOR_TYPES = ['Operator', 'Developer', 'Landlord', 'Broker', 'Advisor', 'Other Intermediary'];
 export const MANDATE_STATUSES = ['Exclusive', 'Non-exclusive', 'Direct', 'Unknown'];
 export const JURISDICTIONS = ['UAE', 'KSA', 'Qatar', 'Bahrain', 'Oman', 'Kuwait', 'Other'];

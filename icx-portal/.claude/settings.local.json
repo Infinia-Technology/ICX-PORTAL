@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E '\\\\.\\(jsx?|tsx?|json|yml|yaml|conf|env\\)$')",
+      "Bash(docker compose:*)"
+    ]
+  }
+}

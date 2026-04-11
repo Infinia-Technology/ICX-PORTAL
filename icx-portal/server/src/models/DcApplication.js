@@ -20,6 +20,20 @@ const dcApplicationSchema = new mongoose.Schema({
   contactEmail: { type: String, maxlength: 500 },
   contactMobile: String,
   otherDetails: String,
+
+  // Archival fields
+  isArchived: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
+  archivedAt: Date,
+  archivedBy: mongoose.Schema.Types.ObjectId,
+  archivedReason: String, // references Archive.reason
+  lastActivityAt: {
+    type: Date,
+    default: Date.now,
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('DcApplication', dcApplicationSchema);

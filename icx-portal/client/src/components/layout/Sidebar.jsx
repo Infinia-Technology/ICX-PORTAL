@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Building2, Server, FileText, Users, ShieldCheck,
-  BarChart3, Settings, ClipboardList, Eye, Zap, Database,
+  BarChart3, Settings, ClipboardList, Eye, Zap, Database, PackageOpen,
 } from 'lucide-react';
 import { ROLES } from '../../config/constants';
 
@@ -10,6 +10,7 @@ const navConfig = {
     { label: 'Dashboard', to: '/supplier/dashboard', icon: LayoutDashboard },
     { label: 'DC Listings', to: '/supplier/dc-listings', icon: Building2 },
     { label: 'GPU Listings', to: '/supplier/gpu-clusters', icon: Server },
+    { label: 'Inventory', to: '/supplier/inventory', icon: PackageOpen },
     { label: 'Team', to: '/supplier/team', icon: Users },
     { label: 'Settings', to: '/supplier/settings', icon: Settings },
   ],
@@ -17,6 +18,7 @@ const navConfig = {
     { label: 'Dashboard', to: '/supplier/dashboard', icon: LayoutDashboard },
     { label: 'DC Listings', to: '/supplier/dc-listings', icon: Building2 },
     { label: 'GPU Listings', to: '/supplier/gpu-clusters', icon: Server },
+    { label: 'Inventory', to: '/supplier/inventory', icon: PackageOpen },
     { label: 'Team', to: '/supplier/team', icon: Users },
     { label: 'Settings', to: '/supplier/settings', icon: Settings },
   ],
@@ -34,6 +36,7 @@ const navConfig = {
     { label: 'Customers', to: '/admin/customers', icon: Users },
     { label: 'DC Listings', to: '/admin/dc-listings', icon: Building2 },
     { label: 'GPU Listings', to: '/admin/gpu-clusters', icon: Server },
+    { label: 'Inventory', to: '/admin/inventory', icon: PackageOpen },
     { label: 'GPU Demands', to: '/admin/gpu-demands', icon: Zap },
     { label: 'DC Requests', to: '/admin/dc-requests', icon: Database },
     { label: 'Readers', to: '/admin/readers', icon: Eye },
@@ -49,6 +52,7 @@ const navConfig = {
     { label: 'Customers', to: '/admin/customers', icon: Users },
     { label: 'DC Listings', to: '/admin/dc-listings', icon: Building2 },
     { label: 'GPU Listings', to: '/admin/gpu-clusters', icon: Server },
+    { label: 'Inventory', to: '/admin/inventory', icon: PackageOpen },
     { label: 'GPU Demands', to: '/admin/gpu-demands', icon: Zap },
     { label: 'DC Requests', to: '/admin/dc-requests', icon: Database },
     { label: 'Readers', to: '/admin/readers', icon: Eye },

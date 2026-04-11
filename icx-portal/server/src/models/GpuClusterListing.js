@@ -77,6 +77,20 @@ const gpuClusterListingSchema = new mongoose.Schema({
   flaggedFields: [String],
   fieldComments: { type: Map, of: String },
   history: [mongoose.Schema.Types.Mixed],
+
+  // Archival fields
+  isArchived: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
+  archivedAt: Date,
+  archivedBy: mongoose.Schema.Types.ObjectId,
+  archivedReason: String, // references Archive.reason
+  lastActivityAt: {
+    type: Date,
+    default: Date.now,
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('GpuClusterListing', gpuClusterListingSchema);

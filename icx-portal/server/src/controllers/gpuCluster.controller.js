@@ -3,13 +3,15 @@ const GpuClusterDocument = require('../models/GpuClusterDocument');
 const { logAction } = require('../services/audit.service');
 const { createQueueItem, updateQueueStatus } = require('../services/queue.service');
 const { paginate } = require('../utils/pagination');
+const { findDuplicateGpuListings } = require('../services/duplicate.service');
 
 // GET /api/gpu-clusters
 const listClusters = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, status } = req.query;
+    const { page = 1, limit = 20, status, includeArchived = false } = req.query;
     const filter = { organizationId: req.user.organizationId };
     if (status) filter.status = status;
+    if (includeArchived !== 'true') filter.isArchived = false;
 
     const result = await paginate(GpuClusterListing, filter, {
       page: parseInt(page), limit: parseInt(limit), sort: { createdAt: -1 },
@@ -68,7 +70,9 @@ const updateCluster = async (req, res, next) => {
     }
     delete body.history;
     Object.assign(cluster, body);
+    cluster.lastActivityAt = new Date();
     await cluster.save();
+    await logAction({ userId: req.user.userId, action: 'UPDATE_GPU_CLUSTER', targetModel: 'GpuClusterListing', targetId: cluster._id, ipAddress: req.ip });
     res.json(cluster);
   } catch (err) { next(err); }
 };
@@ -76,11 +80,32 @@ const updateCluster = async (req, res, next) => {
 // POST /api/gpu-clusters/:id/submit
 const submitCluster = async (req, res, next) => {
   try {
+    const { force = false } = req.body;
     const cluster = await GpuClusterListing.findOne({ _id: req.params.id, organizationId: req.user.organizationId });
     if (!cluster) return res.status(404).json({ error: 'GPU cluster not found' });
 
     if (cluster.status !== 'DRAFT') {
       return res.status(400).json({ error: 'Only draft clusters can be submitted' });
+    }
+
+    // Check for duplicates (skip if force=true)
+    if (!force) {
+      const duplicates = await findDuplicateGpuListings({
+        organizationId: cluster.organizationId,
+        location: cluster.location,
+        googleMapsLink: cluster.googleMapsLink,
+        vendorName: cluster.vendorName,
+        gpu: cluster.gpu,
+      });
+
+      // If duplicates found, return warning without blocking submission
+      if (duplicates.length > 0) {
+        return res.status(200).json({
+          hasDuplicates: true,
+          duplicates,
+          message: `Found ${duplicates.length} potential duplicate(s). Review before confirming.`,
+        });
+      }
     }
 
     cluster.status = 'SUBMITTED';
@@ -89,7 +114,7 @@ const submitCluster = async (req, res, next) => {
 
     await createQueueItem({ type: 'GPU_CLUSTER', referenceId: cluster._id, referenceModel: 'GpuClusterListing' });
     await logAction({ userId: req.user.userId, action: 'SUBMIT_GPU_CLUSTER', targetModel: 'GpuClusterListing', targetId: cluster._id, ipAddress: req.ip });
-    res.json({ message: 'GPU cluster submitted for review', status: cluster.status });
+    res.json({ message: 'GPU cluster submitted for review', status: cluster.status, hasDuplicates: false });
   } catch (err) { next(err); }
 };
 

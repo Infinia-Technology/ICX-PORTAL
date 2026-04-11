@@ -27,6 +27,7 @@ import GpuClustersPage from './pages/supplier/GpuClustersPage';
 import GpuClusterNewPage from './pages/supplier/GpuClusterNewPage';
 import GpuClusterDetailPage from './pages/supplier/GpuClusterDetailPage';
 import GpuClusterEditPage from './pages/supplier/GpuClusterEditPage';
+import SupplierInventoryPage from './pages/supplier/InventoryPage';
 import TeamPage from './pages/supplier/TeamPage';
 import SupplierGpuDemandNewPage from './pages/supplier/GpuDemandNewPage';
 import SupplierDcRequestNewPage from './pages/supplier/DcRequestNewPage';
@@ -53,6 +54,7 @@ import AdminDcListingsPage from './pages/admin/AdminDcListingsPage';
 import DcListingReviewPage from './pages/admin/DcListingReviewPage';
 import AdminGpuClustersPage from './pages/admin/AdminGpuClustersPage';
 import GpuClusterReviewPage from './pages/admin/GpuClusterReviewPage';
+import AdminInventoryPage from './pages/admin/InventoryPage';
 import AdminGpuDemandsPage from './pages/admin/AdminGpuDemandsPage';
 import GpuDemandDetailPage from './pages/admin/GpuDemandDetailPage';
 import AdminDcRequestsPage from './pages/admin/AdminDcRequestsPage';
@@ -98,6 +100,7 @@ export default function App() {
               <Route path="/supplier/gpu-clusters/new" element={<GpuClusterNewPage />} />
               <Route path="/supplier/gpu-clusters/:id" element={<GpuClusterDetailPage />} />
               <Route path="/supplier/gpu-clusters/:id/edit" element={<GpuClusterEditPage />} />
+              <Route path="/supplier/inventory" element={<SupplierInventoryPage />} />
               <Route path="/supplier/team" element={<TeamPage />} />
               <Route path="/supplier/gpu-demands/new" element={<SupplierGpuDemandNewPage />} />
               <Route path="/supplier/dc-requests/new" element={<SupplierDcRequestNewPage />} />
@@ -136,6 +139,7 @@ export default function App() {
               <Route path="/admin/dc-listings/:id" element={<DcListingReviewPage />} />
               <Route path="/admin/gpu-clusters" element={<AdminGpuClustersPage />} />
               <Route path="/admin/gpu-clusters/:id" element={<GpuClusterReviewPage />} />
+              <Route path="/admin/inventory" element={<AdminInventoryPage />} />
               <Route path="/admin/gpu-demands" element={<AdminGpuDemandsPage />} />
               <Route path="/admin/gpu-demands/:id" element={<GpuDemandDetailPage />} />
               <Route path="/admin/dc-requests" element={<AdminDcRequestsPage />} />
