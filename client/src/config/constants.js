@@ -42,6 +42,10 @@ export const RESERVATION_STATUS = {
   CANCELLED: 'CANCELLED',
 };
 
+export const INVENTORY_UNIT_TYPES = ['GPU', 'NODE', 'RACK', 'CLUSTER'];
+export const INVENTORY_PRICING_PERIODS = ['HOUR', 'DAY', 'MONTH', 'YEAR'];
+export const INVENTORY_CURRENCIES = ['USD', 'EUR', 'GBP', 'AED', 'SAR'];
+
 export const VENDOR_TYPES = ['Operator', 'Developer', 'Landlord', 'Broker', 'Advisor', 'Other Intermediary'];
 export const MANDATE_STATUSES = ['Exclusive', 'Non-exclusive', 'Direct', 'Unknown'];
 export const JURISDICTIONS = ['UAE', 'KSA', 'Qatar', 'Bahrain', 'Oman', 'Kuwait', 'Other'];

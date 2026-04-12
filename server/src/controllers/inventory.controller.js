@@ -36,7 +36,16 @@ const createInventory = async (req, res, next) => {
     const schema = z.object({
       name: z.string().min(1, 'Name is required'),
       gpuClusterListingId: z.string().min(1, 'GPU Cluster is required'),
+      unitType: z.enum(['GPU', 'NODE', 'RACK', 'CLUSTER']).optional(),
       totalUnits: z.number().min(1, 'Total units must be at least 1'),
+      pricePerUnit: z.number().min(0).optional(),
+      pricingPeriod: z.enum(['HOUR', 'DAY', 'MONTH', 'YEAR']).optional(),
+      currency: z.enum(['USD', 'EUR', 'GBP', 'AED', 'SAR']).optional(),
+      minOrderQuantity: z.number().min(1).optional(),
+      availabilityStartDate: z.string().optional(),
+      availabilityEndDate: z.string().optional(),
+      location: z.string().optional(),
+      description: z.string().max(2000).optional(),
       notes: z.string().max(500).optional(),
     });
 
@@ -58,11 +67,29 @@ const createInventory = async (req, res, next) => {
       }
     }
 
+    // Validate date range if both provided
+    if (validated.availabilityStartDate && validated.availabilityEndDate) {
+      const startDate = new Date(validated.availabilityStartDate);
+      const endDate = new Date(validated.availabilityEndDate);
+      if (endDate <= startDate) {
+        return res.status(400).json({ error: 'Availability end date must be after start date' });
+      }
+    }
+
     const inventory = new Inventory({
       organizationId: cluster.organizationId,
       gpuClusterListingId: validated.gpuClusterListingId,
       name: validated.name,
+      unitType: validated.unitType || 'GPU',
       totalUnits: validated.totalUnits,
+      pricePerUnit: validated.pricePerUnit,
+      pricingPeriod: validated.pricingPeriod,
+      currency: validated.currency || 'USD',
+      minOrderQuantity: validated.minOrderQuantity || 1,
+      availabilityStartDate: validated.availabilityStartDate ? new Date(validated.availabilityStartDate) : undefined,
+      availabilityEndDate: validated.availabilityEndDate ? new Date(validated.availabilityEndDate) : undefined,
+      location: validated.location || cluster.location,
+      description: validated.description,
       notes: validated.notes,
       status: 'AVAILABLE',
       bookedUnits: 0,
@@ -121,7 +148,16 @@ const updateInventory = async (req, res, next) => {
 
     const schema = z.object({
       name: z.string().min(1).optional(),
+      unitType: z.enum(['GPU', 'NODE', 'RACK', 'CLUSTER']).optional(),
       totalUnits: z.number().min(1).optional(),
+      pricePerUnit: z.number().min(0).optional(),
+      pricingPeriod: z.enum(['HOUR', 'DAY', 'MONTH', 'YEAR']).optional(),
+      currency: z.enum(['USD', 'EUR', 'GBP', 'AED', 'SAR']).optional(),
+      minOrderQuantity: z.number().min(1).optional(),
+      availabilityStartDate: z.string().optional(),
+      availabilityEndDate: z.string().optional(),
+      location: z.string().optional(),
+      description: z.string().max(2000).optional(),
       notes: z.string().max(500).optional(),
     });
 
@@ -129,6 +165,7 @@ const updateInventory = async (req, res, next) => {
 
     // Allowlist updates
     if (validated.name !== undefined) inventory.name = validated.name;
+    if (validated.unitType !== undefined) inventory.unitType = validated.unitType;
     if (validated.totalUnits !== undefined) {
       // Cannot reduce totalUnits below bookedUnits
       if (validated.totalUnits < inventory.bookedUnits) {
@@ -138,6 +175,14 @@ const updateInventory = async (req, res, next) => {
       }
       inventory.totalUnits = validated.totalUnits;
     }
+    if (validated.pricePerUnit !== undefined) inventory.pricePerUnit = validated.pricePerUnit;
+    if (validated.pricingPeriod !== undefined) inventory.pricingPeriod = validated.pricingPeriod;
+    if (validated.currency !== undefined) inventory.currency = validated.currency;
+    if (validated.minOrderQuantity !== undefined) inventory.minOrderQuantity = validated.minOrderQuantity;
+    if (validated.availabilityStartDate !== undefined) inventory.availabilityStartDate = new Date(validated.availabilityStartDate);
+    if (validated.availabilityEndDate !== undefined) inventory.availabilityEndDate = new Date(validated.availabilityEndDate);
+    if (validated.location !== undefined) inventory.location = validated.location;
+    if (validated.description !== undefined) inventory.description = validated.description;
     if (validated.notes !== undefined) inventory.notes = validated.notes;
 
     await inventory.save();

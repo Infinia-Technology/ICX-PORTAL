@@ -8,13 +8,45 @@ import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import Modal from '../../components/ui/Modal';
 import Spinner from '../../components/ui/Spinner';
+import DatePicker from '../../components/ui/DatePicker';
 import InfoIcon from '../../components/ui/InfoIcon';
 import { useToast } from '../../components/ui/Toast';
+
+const UNIT_TYPE_OPTIONS = [
+  { value: 'GPU', label: 'GPU' },
+  { value: 'NODE', label: 'Node' },
+  { value: 'RACK', label: 'Rack' },
+  { value: 'CLUSTER', label: 'Cluster' },
+];
+
+const PRICING_PERIOD_OPTIONS = [
+  { value: 'HOUR', label: 'Per Hour' },
+  { value: 'DAY', label: 'Per Day' },
+  { value: 'MONTH', label: 'Per Month' },
+  { value: 'YEAR', label: 'Per Year' },
+];
+
+const CURRENCY_OPTIONS = [
+  { value: 'USD', label: 'USD' },
+  { value: 'EUR', label: 'EUR' },
+  { value: 'GBP', label: 'GBP' },
+  { value: 'AED', label: 'AED' },
+  { value: 'SAR', label: 'SAR' },
+];
 
 const EMPTY_FORM = {
   name: '',
   gpuClusterListingId: '',
+  unitType: 'GPU',
   totalUnits: '',
+  pricePerUnit: '',
+  pricingPeriod: '',
+  currency: 'USD',
+  minOrderQuantity: '1',
+  availabilityStartDate: '',
+  availabilityEndDate: '',
+  location: '',
+  description: '',
   notes: '',
 };
 
@@ -76,7 +108,16 @@ export default function SupplierInventoryPage() {
     setForm({
       name: row.name,
       gpuClusterListingId: row.gpuClusterListingId._id || row.gpuClusterListingId,
+      unitType: row.unitType || 'GPU',
       totalUnits: row.totalUnits,
+      pricePerUnit: row.pricePerUnit || '',
+      pricingPeriod: row.pricingPeriod || '',
+      currency: row.currency || 'USD',
+      minOrderQuantity: row.minOrderQuantity || '1',
+      availabilityStartDate: row.availabilityStartDate ? row.availabilityStartDate.slice(0, 10) : '',
+      availabilityEndDate: row.availabilityEndDate ? row.availabilityEndDate.slice(0, 10) : '',
+      location: row.location || '',
+      description: row.description || '',
       notes: row.notes || '',
     });
     setShowModal(true);
@@ -87,9 +128,18 @@ export default function SupplierInventoryPage() {
     try {
       const payload = {
         name: form.name,
+        unitType: form.unitType,
         totalUnits: parseInt(form.totalUnits, 10),
+        currency: form.currency,
+        minOrderQuantity: parseInt(form.minOrderQuantity, 10) || 1,
+        location: form.location,
+        description: form.description,
         notes: form.notes,
       };
+      if (form.pricePerUnit) payload.pricePerUnit = parseFloat(form.pricePerUnit);
+      if (form.pricingPeriod) payload.pricingPeriod = form.pricingPeriod;
+      if (form.availabilityStartDate) payload.availabilityStartDate = form.availabilityStartDate;
+      if (form.availabilityEndDate) payload.availabilityEndDate = form.availabilityEndDate;
 
       if (editing) {
         await api.put(`/inventory/${editing._id}`, payload);
@@ -152,6 +202,11 @@ export default function SupplierInventoryPage() {
       render: (v) => v?.vendorName || 'N/A',
     },
     {
+      key: 'unitType',
+      label: 'Unit Type',
+      render: (v) => v || 'GPU',
+    },
+    {
       key: 'status',
       label: 'Status',
       render: (v) => <Badge status={v} />,
@@ -172,6 +227,17 @@ export default function SupplierInventoryPage() {
           </span>
         </div>
       ),
+    },
+    {
+      key: 'pricePerUnit',
+      label: 'Price',
+      render: (v, row) =>
+        v ? `${row.currency || 'USD'} ${v}/${(row.pricingPeriod || 'MONTH').toLowerCase()}` : '-',
+    },
+    {
+      key: 'location',
+      label: 'Location',
+      render: (v) => v || '-',
     },
     {
       key: 'createdAt',
@@ -309,7 +375,15 @@ export default function SupplierInventoryPage() {
               <Select
                 required
                 value={form.gpuClusterListingId}
-                onChange={(e) => setForm((p) => ({ ...p, gpuClusterListingId: e.target.value }))}
+                onChange={(e) => {
+                  const clusterId = e.target.value;
+                  const selectedCluster = clusters.find((c) => c._id === clusterId);
+                  setForm((p) => ({
+                    ...p,
+                    gpuClusterListingId: clusterId,
+                    location: selectedCluster?.location || p.location,
+                  }));
+                }}
                 options={clusters
                   .filter((c) => c.status === 'APPROVED')
                   .map((c) => ({ value: c._id, label: `${c.vendorName} (${c.gpu})` }))}
@@ -325,25 +399,121 @@ export default function SupplierInventoryPage() {
               <Badge status={editing.status} />
             </div>
           )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="text-sm font-medium">Unit Type</label>
+                <InfoIcon text="What constitutes a unit: GPU, Node, Rack, or full Cluster" placement="top" />
+              </div>
+              <Select
+                value={form.unitType}
+                onChange={(e) => setForm((p) => ({ ...p, unitType: e.target.value }))}
+                options={UNIT_TYPE_OPTIONS}
+              />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="text-sm font-medium">Total Units</label>
+                <span className="text-red-500">*</span>
+                <InfoIcon text="Total number of units available. Cannot be reduced below booked units." placement="top" />
+              </div>
+              <Input
+                required
+                type="number"
+                min="1"
+                value={form.totalUnits}
+                onChange={(e) => setForm((p) => ({ ...p, totalUnits: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="text-sm font-medium">Price Per Unit</label>
+                <InfoIcon text="Price per unit per the selected pricing period" placement="top" />
+              </div>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.pricePerUnit}
+                onChange={(e) => setForm((p) => ({ ...p, pricePerUnit: e.target.value }))}
+              />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="text-sm font-medium">Pricing Period</label>
+              </div>
+              <Select
+                value={form.pricingPeriod}
+                onChange={(e) => setForm((p) => ({ ...p, pricingPeriod: e.target.value }))}
+                options={PRICING_PERIOD_OPTIONS}
+              />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="text-sm font-medium">Currency</label>
+              </div>
+              <Select
+                value={form.currency}
+                onChange={(e) => setForm((p) => ({ ...p, currency: e.target.value }))}
+                options={CURRENCY_OPTIONS}
+              />
+            </div>
+          </div>
+
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <label className="text-sm font-medium">Total Units</label>
-              <span className="text-red-500">*</span>
-              <InfoIcon text="Total number of units available. Cannot be edited once units are booked." placement="top" />
+              <label className="text-sm font-medium">Minimum Order Quantity</label>
+              <InfoIcon text="Minimum number of units per reservation" placement="top" />
             </div>
             <Input
-              required
               type="number"
               min="1"
-              value={form.totalUnits}
-              onChange={(e) => setForm((p) => ({ ...p, totalUnits: e.target.value }))}
+              value={form.minOrderQuantity}
+              onChange={(e) => setForm((p) => ({ ...p, minOrderQuantity: e.target.value }))}
             />
           </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <DatePicker
+              label="Availability Start Date"
+              value={form.availabilityStartDate}
+              onChange={(e) => setForm((p) => ({ ...p, availabilityStartDate: e.target.value }))}
+            />
+            <DatePicker
+              label="Availability End Date"
+              value={form.availabilityEndDate}
+              onChange={(e) => setForm((p) => ({ ...p, availabilityEndDate: e.target.value }))}
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <label className="text-sm font-medium">Location</label>
+              <InfoIcon text="Auto-filled from GPU cluster. Override if needed." placement="top" />
+            </div>
+            <Input
+              value={form.location}
+              placeholder="Auto-filled from GPU cluster"
+              onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))}
+            />
+          </div>
+          <Input
+            label="Description"
+            type="textarea"
+            value={form.description}
+            onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+            placeholder="Detailed description of the inventory offering"
+          />
           <Input
             label="Notes"
             type="textarea"
             value={form.notes}
             onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+            placeholder="Internal notes (max 500 characters)"
           />
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setShowModal(false)}>

@@ -12,10 +12,41 @@ import DatePicker from '../../components/ui/DatePicker';
 import { useToast } from '../../components/ui/Toast';
 import { INVENTORY_STATUS, RESERVATION_STATUS } from '../../config/constants';
 
+const UNIT_TYPE_OPTIONS = [
+  { value: 'GPU', label: 'GPU' },
+  { value: 'NODE', label: 'Node' },
+  { value: 'RACK', label: 'Rack' },
+  { value: 'CLUSTER', label: 'Cluster' },
+];
+
+const PRICING_PERIOD_OPTIONS = [
+  { value: 'HOUR', label: 'Per Hour' },
+  { value: 'DAY', label: 'Per Day' },
+  { value: 'MONTH', label: 'Per Month' },
+  { value: 'YEAR', label: 'Per Year' },
+];
+
+const CURRENCY_OPTIONS = [
+  { value: 'USD', label: 'USD' },
+  { value: 'EUR', label: 'EUR' },
+  { value: 'GBP', label: 'GBP' },
+  { value: 'AED', label: 'AED' },
+  { value: 'SAR', label: 'SAR' },
+];
+
 const EMPTY_FORM = {
   name: '',
   gpuClusterListingId: '',
+  unitType: 'GPU',
   totalUnits: '',
+  pricePerUnit: '',
+  pricingPeriod: '',
+  currency: 'USD',
+  minOrderQuantity: '1',
+  availabilityStartDate: '',
+  availabilityEndDate: '',
+  location: '',
+  description: '',
   notes: '',
 };
 
@@ -94,7 +125,16 @@ export default function InventoryPage() {
     setForm({
       name: row.name,
       gpuClusterListingId: row.gpuClusterListingId._id || row.gpuClusterListingId,
+      unitType: row.unitType || 'GPU',
       totalUnits: row.totalUnits,
+      pricePerUnit: row.pricePerUnit || '',
+      pricingPeriod: row.pricingPeriod || '',
+      currency: row.currency || 'USD',
+      minOrderQuantity: row.minOrderQuantity || '1',
+      availabilityStartDate: row.availabilityStartDate ? row.availabilityStartDate.slice(0, 10) : '',
+      availabilityEndDate: row.availabilityEndDate ? row.availabilityEndDate.slice(0, 10) : '',
+      location: row.location || '',
+      description: row.description || '',
       notes: row.notes || '',
     });
     setShowModal(true);
@@ -117,9 +157,18 @@ export default function InventoryPage() {
     try {
       const payload = {
         name: form.name,
+        unitType: form.unitType,
         totalUnits: parseInt(form.totalUnits, 10),
+        currency: form.currency,
+        minOrderQuantity: parseInt(form.minOrderQuantity, 10) || 1,
+        location: form.location,
+        description: form.description,
         notes: form.notes,
       };
+      if (form.pricePerUnit) payload.pricePerUnit = parseFloat(form.pricePerUnit);
+      if (form.pricingPeriod) payload.pricingPeriod = form.pricingPeriod;
+      if (form.availabilityStartDate) payload.availabilityStartDate = form.availabilityStartDate;
+      if (form.availabilityEndDate) payload.availabilityEndDate = form.availabilityEndDate;
 
       if (editing) {
         await api.put(`/inventory/${editing._id}`, payload);
@@ -232,6 +281,11 @@ export default function InventoryPage() {
       render: (v) => v?.vendorName || 'N/A',
     },
     {
+      key: 'unitType',
+      label: 'Unit Type',
+      render: (v) => v || 'GPU',
+    },
+    {
       key: 'status',
       label: 'Status',
       render: (v) => <Badge status={v} />,
@@ -252,6 +306,17 @@ export default function InventoryPage() {
           </span>
         </div>
       ),
+    },
+    {
+      key: 'pricePerUnit',
+      label: 'Price',
+      render: (v, row) =>
+        v ? `${row.currency || 'USD'} ${v}/${(row.pricingPeriod || 'MONTH').toLowerCase()}` : '-',
+    },
+    {
+      key: 'location',
+      label: 'Location',
+      render: (v) => v || '-',
     },
     {
       key: 'createdAt',
@@ -409,7 +474,15 @@ export default function InventoryPage() {
               label="GPU Cluster"
               required
               value={form.gpuClusterListingId}
-              onChange={(e) => setForm((p) => ({ ...p, gpuClusterListingId: e.target.value }))}
+              onChange={(e) => {
+                const clusterId = e.target.value;
+                const selectedCluster = clusters.find((c) => c._id === clusterId);
+                setForm((p) => ({
+                  ...p,
+                  gpuClusterListingId: clusterId,
+                  location: selectedCluster?.location || p.location,
+                }));
+              }}
               options={clusters
                 .filter((c) => c.status === 'APPROVED')
                 .map((c) => ({ value: c._id, label: `${c.vendorName} (${c.gpu})` }))}
@@ -424,19 +497,87 @@ export default function InventoryPage() {
               </p>
             </div>
           )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <Select
+              label="Unit Type"
+              value={form.unitType}
+              onChange={(e) => setForm((p) => ({ ...p, unitType: e.target.value }))}
+              options={UNIT_TYPE_OPTIONS}
+            />
+            <Input
+              label="Total Units"
+              required
+              type="number"
+              min="1"
+              value={form.totalUnits}
+              onChange={(e) => setForm((p) => ({ ...p, totalUnits: e.target.value }))}
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <Input
+              label="Price Per Unit"
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.pricePerUnit}
+              onChange={(e) => setForm((p) => ({ ...p, pricePerUnit: e.target.value }))}
+            />
+            <Select
+              label="Pricing Period"
+              value={form.pricingPeriod}
+              onChange={(e) => setForm((p) => ({ ...p, pricingPeriod: e.target.value }))}
+              options={PRICING_PERIOD_OPTIONS}
+            />
+            <Select
+              label="Currency"
+              value={form.currency}
+              onChange={(e) => setForm((p) => ({ ...p, currency: e.target.value }))}
+              options={CURRENCY_OPTIONS}
+            />
+          </div>
+
           <Input
-            label="Total Units"
-            required
+            label="Minimum Order Quantity"
             type="number"
             min="1"
-            value={form.totalUnits}
-            onChange={(e) => setForm((p) => ({ ...p, totalUnits: e.target.value }))}
+            value={form.minOrderQuantity}
+            onChange={(e) => setForm((p) => ({ ...p, minOrderQuantity: e.target.value }))}
+          />
+
+          <div className="grid grid-cols-2 gap-4">
+            <DatePicker
+              label="Availability Start Date"
+              value={form.availabilityStartDate}
+              onChange={(e) => setForm((p) => ({ ...p, availabilityStartDate: e.target.value }))}
+            />
+            <DatePicker
+              label="Availability End Date"
+              value={form.availabilityEndDate}
+              onChange={(e) => setForm((p) => ({ ...p, availabilityEndDate: e.target.value }))}
+            />
+          </div>
+
+          <Input
+            label="Location"
+            value={form.location}
+            placeholder="Auto-filled from GPU cluster"
+            onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))}
+          />
+          <Input
+            label="Description"
+            type="textarea"
+            value={form.description}
+            onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+            placeholder="Detailed description of the inventory offering"
           />
           <Input
             label="Notes"
             type="textarea"
             value={form.notes}
             onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+            placeholder="Internal notes (max 500 characters)"
           />
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setShowModal(false)}>

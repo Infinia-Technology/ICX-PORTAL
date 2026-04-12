@@ -20,6 +20,11 @@ const inventorySchema = new mongoose.Schema({
     enum: ['AVAILABLE', 'RESERVED', 'SOLD', 'ARCHIVED'],
     default: 'AVAILABLE',
   },
+  unitType: {
+    type: String,
+    enum: ['GPU', 'NODE', 'RACK', 'CLUSTER'],
+    default: 'GPU',
+  },
   totalUnits: {
     type: Number,
     required: true,
@@ -34,6 +39,37 @@ const inventorySchema = new mongoose.Schema({
     type: Number,
     default: 0,
     min: 0,
+  },
+  pricePerUnit: {
+    type: Number,
+    min: 0,
+  },
+  pricingPeriod: {
+    type: String,
+    enum: ['HOUR', 'DAY', 'MONTH', 'YEAR'],
+  },
+  currency: {
+    type: String,
+    enum: ['USD', 'EUR', 'GBP', 'AED', 'SAR'],
+    default: 'USD',
+  },
+  minOrderQuantity: {
+    type: Number,
+    min: 1,
+    default: 1,
+  },
+  availabilityStartDate: {
+    type: Date,
+  },
+  availabilityEndDate: {
+    type: Date,
+  },
+  location: {
+    type: String,
+  },
+  description: {
+    type: String,
+    maxlength: 2000,
   },
   notes: {
     type: String,
