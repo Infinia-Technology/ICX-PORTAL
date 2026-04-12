@@ -29,7 +29,7 @@ export default function Select({
           `}
           {...props}
         >
-          <option value="">{placeholder}</option>
+          <option value="" disabled hidden>{placeholder}</option>
           {options.map((opt) => {
             const value = typeof opt === 'string' ? opt : opt.value;
             const label = typeof opt === 'string' ? opt : opt.label;
