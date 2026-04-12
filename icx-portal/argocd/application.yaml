@@ -17,6 +17,6 @@ spec:
       - CreateNamespace=true
     # Sync is manual — trigger from ArgoCD UI or CLI after CI updates image tags
     # To enable auto-sync uncomment below:
-    # automated:
-    #   prune: true
-    #   selfHeal: true
+    automated:
+      prune: true
+      selfHeal: true
