@@ -343,7 +343,13 @@ export default function DcListingNewPage() {
             <Select label="On-site substation status" name="substationStatus" value={step5.substationStatus} onChange={f(setStep5)} options={['', 'Existing', 'Under Construction', 'Planned', 'Off-site only'].map((o) => ({ value: o, label: o || 'Select...' }))} />
             <Select label="Transformer redundancy" name="transformerRedundancy" value={step5.transformerRedundancy} onChange={f(setStep5)} options={['', 'N', 'N+1', '2N', 'Unknown'].map((o) => ({ value: o, label: o || 'Select...' }))} />
             <Select label="Maintenance concurrency" name="maintenanceConcurrency" value={step5.maintenanceConcurrency} onChange={f(setStep5)} options={['', 'Yes', 'No', 'Partial'].map((o) => ({ value: o, label: o || 'Select...' }))} />
-            <Input label="UPS Autonomy, minutes *" name="upsAutonomyMin" type="number" value={step5.upsAutonomyMin} onChange={f(setStep5)} placeholder="Whole numbers only" />
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="text-sm font-medium">UPS Autonomy, minutes (backup duration the UPS can support at the stated design / target load before other backup sources are required) *</label>
+                <InfoIcon text="Time in minutes that UPS can maintain power at design load before backup generators or other sources activate." placement="top" />
+              </div>
+              <Input name="upsAutonomyMin" type="number" value={step5.upsAutonomyMin} onChange={f(setStep5)} placeholder="Whole numbers only" />
+            </div>
             <Select label="UPS topology" name="upsTopology" value={step5.upsTopology} onChange={f(setStep5)} options={['', 'Centralized', 'Distributed', 'Block Redundant', 'Modular'].map((o) => ({ value: o, label: o || 'Select...' }))} />
             <Input label="Renewable Energy, % of Total" name="renewableEnergyPct" type="number" value={step5.renewableEnergyPct} onChange={f(setStep5)} placeholder="Whole numbers only" />
             <div className="sm:col-span-2">
