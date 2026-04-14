@@ -463,22 +463,67 @@ export default function DcListingNewPage() {
       case 9:
         return (
           <div className="space-y-4">
-            <p className="text-[var(--color-text-secondary)]">Review your DC listing and submit for admin review.</p>
+            <p className="text-[var(--color-text-secondary)] text-sm">Review all your entered information. You can edit any field directly below. Review is optional — you can skip and submit directly.</p>
+
+            {/* Company Details */}
             <Card>
-              <h3 className="font-semibold mb-3">Company Details</h3>
-              <dl className="grid sm:grid-cols-2 gap-2 text-sm">
-                <dt className="text-gray-500">Legal Entity</dt><dd>{step1.companyLegalEntity}</dd>
-                <dt className="text-gray-500">Country</dt><dd>{step1.companyCountry}</dd>
-                <dt className="text-gray-500">Contact Name</dt><dd>{step1.contactName}</dd>
-              </dl>
+              <h3 className="font-semibold mb-4">Company Details</h3>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Input label="Legal Entity" value={step1.companyLegalEntity} onChange={(e) => setStep1({...step1, companyLegalEntity: e.target.value})} />
+                <Input label="Office Address" value={step1.companyOfficeAddress} onChange={(e) => setStep1({...step1, companyOfficeAddress: e.target.value})} />
+                <Input label="Country" value={step1.companyCountry} onChange={(e) => setStep1({...step1, companyCountry: e.target.value})} />
+                <Input label="Contact Name" value={step1.contactName} onChange={(e) => setStep1({...step1, contactName: e.target.value})} />
+                <Input label="Contact Mobile" value={step1.contactMobile} onChange={(e) => setStep1({...step1, contactMobile: e.target.value})} />
+                <TextArea label="Other Details" value={step1.otherDetails} onChange={(e) => setStep1({...step1, otherDetails: e.target.value})} />
+              </div>
             </Card>
+
+            {/* Site Details */}
             <Card>
-              <h3 className="font-semibold mb-3">Site Details</h3>
-              <dl className="grid sm:grid-cols-2 gap-2 text-sm">
-                <dt className="text-gray-500">Site Name</dt><dd>{step2.siteName}</dd>
-                <dt className="text-gray-500">Location</dt><dd>{step2.address}, {step2.country}</dd>
-                <dt className="text-gray-500">Total IT Load</dt><dd>{step3.totalItLoadMw} MW</dd>
-              </dl>
+              <h3 className="font-semibold mb-4">Site Details</h3>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Input label="Site Name" value={step2.siteName} onChange={(e) => setStep2({...step2, siteName: e.target.value})} />
+                <Input label="Address" value={step2.address} onChange={(e) => setStep2({...step2, address: e.target.value})} />
+                <Input label="Country" value={step2.country} onChange={(e) => setStep2({...step2, country: e.target.value})} />
+                <Input label="State/Region" value={step2.stateRegion} onChange={(e) => setStep2({...step2, stateRegion: e.target.value})} />
+                <Input label="Business Model" value={step2.businessModel} onChange={(e) => setStep2({...step2, businessModel: e.target.value})} />
+                <Input label="Project Type" value={step2.projectType} onChange={(e) => setStep2({...step2, projectType: e.target.value})} />
+              </div>
+            </Card>
+
+            {/* Capacity & Energy */}
+            <Card>
+              <h3 className="font-semibold mb-4">Capacity & Energy</h3>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Input label="Current Energized MW" type="number" value={step3.currentEnergizedMw} onChange={(e) => setStep3({...step3, currentEnergizedMw: e.target.value})} />
+                <Input label="Total IT Load MW" type="number" value={step3.totalItLoadMw} onChange={(e) => setStep3({...step3, totalItLoadMw: e.target.value})} />
+                <Input label="Total Utility MVA" type="number" value={step3.totalUtilityMva} onChange={(e) => setStep3({...step3, totalUtilityMva: e.target.value})} />
+                <Input label="Total White Space (sqm)" type="number" value={step3.totalWhiteSpaceSqm} onChange={(e) => setStep3({...step3, totalWhiteSpaceSqm: e.target.value})} />
+              </div>
+            </Card>
+
+            {/* Power Infrastructure Summary */}
+            <Card>
+              <h3 className="font-semibold mb-4">Power Infrastructure</h3>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Input label="Power Source" value={step5.powerSource} onChange={(e) => setStep5({...step5, powerSource: e.target.value})} />
+                <Input label="Grid Voltage (kV)" type="number" value={step5.gridVoltageKv} onChange={(e) => setStep5({...step5, gridVoltageKv: e.target.value})} />
+                <Input label="Power Redundancy" value={step5.powerRedundancy} onChange={(e) => setStep5({...step5, powerRedundancy: e.target.value})} />
+                <Input label="Backup Power" value={step5.backupPower} onChange={(e) => setStep5({...step5, backupPower: e.target.value})} />
+                <Input label="Renewable Energy %" type="number" value={step5.renewableEnergyPct} onChange={(e) => setStep5({...step5, renewableEnergyPct: e.target.value})} />
+                <Input label="UPS Autonomy (min)" type="number" value={step5.upsAutonomyMin} onChange={(e) => setStep5({...step5, upsAutonomyMin: e.target.value})} />
+              </div>
+            </Card>
+
+            {/* Commercial Terms Summary */}
+            <Card>
+              <h3 className="font-semibold mb-4">Commercial Terms</h3>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Input label="Lease Term Options" value={step7.leaseTermOptions} onChange={(e) => setStep7({...step7, leaseTermOptions: e.target.value})} />
+                <Input label="Payment Frequency" value={step7.paymentFrequency} onChange={(e) => setStep7({...step7, paymentFrequency: e.target.value})} />
+                <Input label="Tax/VAT Treatment" value={step7.taxVatTreatment} onChange={(e) => setStep7({...step7, taxVatTreatment: e.target.value})} />
+                <Input label="Avg Power Price (cents/kWh)" type="number" value={step7.powerPriceCurrentUsd} onChange={(e) => setStep7({...step7, powerPriceCurrentUsd: e.target.value})} />
+              </div>
             </Card>
           </div>
         );
