@@ -109,12 +109,13 @@ export default function DcListingNewPage() {
       return false;
     }
     try {
+      const cleanData = extractCleanData(step1);
       if (!appId) {
-        const res = await api.post('/dc-applications', step1);
+        const res = await api.post('/dc-applications', cleanData);
         setAppId(res.data._id);
         updateUrl(res.data._id, null, 1);
       } else {
-        await api.put(`/dc-applications/${appId}`, step1);
+        await api.put(`/dc-applications/${appId}`, cleanData);
       }
       return true;
     } catch (err) {
@@ -129,12 +130,13 @@ export default function DcListingNewPage() {
       return false;
     }
     try {
+      const cleanData = extractCleanData({ ...step2, ...step3 });
       if (!siteId) {
-        const res = await api.post(`/dc-applications/${appId}/sites`, { ...step2, ...step3 });
+        const res = await api.post(`/dc-applications/${appId}/sites`, cleanData);
         setSiteId(res.data._id);
         updateUrl(null, res.data._id);
       } else {
-        await api.put(`/dc-applications/${appId}/sites/${siteId}`, { ...step2, ...step3 });
+        await api.put(`/dc-applications/${appId}/sites/${siteId}`, cleanData);
       }
       return true;
     } catch (err) {
@@ -149,12 +151,15 @@ export default function DcListingNewPage() {
       return false;
     }
     try {
+      const cleanData = extractCleanData(data);
       if (!siteId) {
-        const res = await api.post(`/dc-applications/${appId}/sites`, { siteName: step2.siteName || 'Site 1', ...step2, ...step3, ...data });
+        const merged = { siteName: step2.siteName || 'Site 1', ...step2, ...step3, ...data };
+        const cleanMerged = extractCleanData(merged);
+        const res = await api.post(`/dc-applications/${appId}/sites`, cleanMerged);
         setSiteId(res.data._id);
         updateUrl(null, res.data._id);
       } else {
-        await api.put(`/dc-applications/${appId}/sites/${siteId}`, data);
+        await api.put(`/dc-applications/${appId}/sites/${siteId}`, cleanData);
       }
       return true;
     } catch (err) {
@@ -187,36 +192,24 @@ export default function DcListingNewPage() {
     updateUrl(null, null, prevStep);
   };
 
-  // Helper to sanitize data for JSON serialization
-  const sanitizeData = (obj) => {
+  // Helper to extract only primitive values from form state
+  const extractCleanData = (obj) => {
     if (!obj || typeof obj !== 'object') return obj;
 
-    const sanitized = {};
+    const result = {};
     for (const [key, value] of Object.entries(obj)) {
-      // Skip functions and undefined
-      if (typeof value === 'function' || value === undefined) continue;
-
-      // Skip objects that look like DOM elements or React internals
-      if (value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
-        if ('nodeType' in value || '__reactFiber' in value || '__reactProps' in value) continue;
-        // Skip other complex objects that aren't plain objects
-        if (value.constructor && value.constructor.name !== 'Object') continue;
+      // Only include primitives and arrays of primitives
+      if (value === null || value === undefined) {
+        result[key] = value;
+      } else if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        result[key] = value;
+      } else if (Array.isArray(value)) {
+        // Only include string arrays (like renewable types)
+        result[key] = value.filter(v => typeof v === 'string');
       }
-
-      // Handle arrays - filter out complex objects
-      if (Array.isArray(value)) {
-        sanitized[key] = value.filter(v => {
-          if (typeof v === 'function') return false;
-          if (v && typeof v === 'object' && !Array.isArray(v)) {
-            if ('nodeType' in v || '__reactFiber' in v) return false;
-          }
-          return typeof v !== 'function';
-        });
-      } else {
-        sanitized[key] = value;
-      }
+      // Skip all objects and functions
     }
-    return sanitized;
+    return result;
   };
 
   const submit = async (force = false) => {
@@ -225,10 +218,8 @@ export default function DcListingNewPage() {
       // Save company details (step1) before submitting
       if (appId && step1.companyLegalEntity) {
         try {
-          const company = sanitizeData(step1);
-          // Ensure JSON serializable by round-tripping through JSON.stringify
-          const companyClean = JSON.parse(JSON.stringify(company));
-          await api.put(`/dc-applications/${appId}`, companyClean);
+          const company = extractCleanData(step1);
+          await api.put(`/dc-applications/${appId}`, company);
         } catch (err) {
           addToast({ type: 'error', message: `Failed to save company details: ${err.response?.data?.error || err.message}` });
           setSubmitting(false);
@@ -239,10 +230,9 @@ export default function DcListingNewPage() {
       // Save all site data before submitting
       if (siteId && appId) {
         try {
-          const siteData = sanitizeData({ ...step2, ...step3, ...step4, ...step5, ...step6, ...step7, ...step9, ...step8 });
-          // Ensure JSON serializable by round-tripping through JSON.stringify
-          const siteDataClean = JSON.parse(JSON.stringify(siteData));
-          await api.put(`/dc-applications/${appId}/sites/${siteId}`, siteDataClean);
+          const merged = { ...step2, ...step3, ...step4, ...step5, ...step6, ...step7, ...step9, ...step8 };
+          const siteData = extractCleanData(merged);
+          await api.put(`/dc-applications/${appId}/sites/${siteId}`, siteData);
         } catch (err) {
           addToast({ type: 'error', message: `Failed to save site data: ${err.response?.data?.error || err.message}` });
           setSubmitting(false);
