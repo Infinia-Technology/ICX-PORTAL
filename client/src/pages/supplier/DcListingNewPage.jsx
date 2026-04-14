@@ -192,13 +192,25 @@ export default function DcListingNewPage() {
     try {
       // Save company details (step1) before submitting
       if (appId && step1.companyLegalEntity) {
-        await api.put(`/dc-applications/${appId}`, step1);
+        try {
+          await api.put(`/dc-applications/${appId}`, step1);
+        } catch (err) {
+          addToast({ type: 'error', message: `Failed to save company details: ${err.response?.data?.error || err.message}` });
+          setSubmitting(false);
+          return;
+        }
       }
 
       // Save all site data before submitting
       if (siteId && appId) {
         const siteData = { ...step2, ...step3, ...step4, ...step5, ...step6, ...step7, ...step9, ...step8 };
-        await api.put(`/dc-applications/${appId}/sites/${siteId}`, siteData);
+        try {
+          await api.put(`/dc-applications/${appId}/sites/${siteId}`, siteData);
+        } catch (err) {
+          addToast({ type: 'error', message: `Failed to save site data: ${err.response?.data?.error || err.message}` });
+          setSubmitting(false);
+          return;
+        }
       }
 
       const res = await api.post(`/dc-applications/${appId}/submit`, { force });
@@ -213,7 +225,8 @@ export default function DcListingNewPage() {
       addToast({ type: 'success', message: 'DC listing submitted successfully! Our team will review it shortly.' });
       navigate('/supplier/dc-listings');
     } catch (err) {
-      addToast({ type: 'error', message: err.response?.data?.error || 'Failed to submit' });
+      console.error('Submit error:', err);
+      addToast({ type: 'error', message: err.response?.data?.error || err.message || 'Failed to submit' });
       setSubmitting(false);
     }
   };

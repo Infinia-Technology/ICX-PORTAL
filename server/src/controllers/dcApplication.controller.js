@@ -122,33 +122,44 @@ const updateApplication = async (req, res, next) => {
 // POST /api/dc-applications/:id/submit
 const submitApplication = async (req, res, next) => {
   try {
+    console.log(`[SUBMIT] Attempting to submit DC app ${req.params.id} for user ${req.user.userId} (org: ${req.user.organization_id})`);
+
     const app = await prisma.listing.findFirst({
       where: { id: req.params.id, organization_id: req.user.organization_id }
     });
-    if (!app) return res.status(404).json({ error: 'Application not found' });
+    if (!app) {
+      console.log(`[SUBMIT] App not found or access denied for ${req.params.id}`);
+      return res.status(404).json({ error: 'Application not found' });
+    }
 
+    console.log(`[SUBMIT] Found app with status: ${app.status}`);
     if (!['DRAFT', 'REVISION_REQUESTED'].includes(app.status)) {
       return res.status(400).json({ error: 'Only draft or revision-requested applications can be submitted' });
     }
 
     const updated = await prisma.listing.update({
       where: { id: app.id },
-      data: { 
+      data: {
         status: 'SUBMITTED',
         updated_at: new Date()
       }
     });
 
     await logAction({ userId: req.user.userId, action: 'SUBMIT_DC_APPLICATION', targetModel: 'Listing', targetId: updated.id, ipAddress: req.ip });
-    
+
+    console.log(`[SUBMIT] Creating queue item for listing ${updated.id}`);
     await createQueueItem({
       type: 'DC_LISTING',
       referenceId: updated.id,
       referenceModel: 'Listing'
     });
-    
+
+    console.log(`[SUBMIT] Successfully submitted application ${updated.id}`);
     res.json({ message: 'Application submitted for review', status: updated.status, _id: updated.id });
-  } catch (err) { next(err); }
+  } catch (err) {
+    console.error('[SUBMIT] Error:', err);
+    next(err);
+  }
 };
 
 // POST /api/dc-applications/:id/resubmit
