@@ -38,7 +38,14 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Admin Dashboard</h1>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold mb-2">Admin Dashboard</h1>
+        <Card className="bg-blue-50 border-blue-200">
+          <p className="text-sm text-blue-900">
+            <strong>How to add new listings:</strong> Navigate to <strong>DC Listings</strong> or <strong>GPU Listings</strong> in the sidebar to review supplier submissions. Suppliers create and submit their own listings for your approval.
+          </p>
+        </Card>
+      </div>
 
       {/* KPI Stats */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

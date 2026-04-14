@@ -1,6 +1,4 @@
-const DcApplication = require('../models/DcApplication');
-const DcSite = require('../models/DcSite');
-const GpuClusterListing = require('../models/GpuClusterListing');
+const prisma = require('../config/prisma');
 const { advancedFuzzyMatch } = require('./fuzzyMatch.service');
 
 /**
@@ -24,26 +22,19 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 
 /**
  * Extract coordinates from Google Maps link
- * Format: https://maps.google.com/?q=lat,lng
  */
 const extractCoordinates = (mapsLink) => {
   if (!mapsLink) return null;
-
   try {
     const match = mapsLink.match(/q=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
     if (match && match[1] && match[2]) {
       return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
     }
-
-    // Try alternative format
     const match2 = mapsLink.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
     if (match2 && match2[1] && match2[2]) {
       return { lat: parseFloat(match2[1]), lng: parseFloat(match2[2]) };
     }
-  } catch (err) {
-    console.error('Failed to extract coordinates:', err);
-  }
-
+  } catch (err) { console.error('Failed to extract coordinates:', err); }
   return null;
 };
 
@@ -52,79 +43,66 @@ const extractCoordinates = (mapsLink) => {
  */
 const calculateStringSimilarity = (str1, str2) => {
   if (!str1 || !str2) return 0;
-
   const s1 = String(str1).toLowerCase().trim();
   const s2 = String(str2).toLowerCase().trim();
-
   if (s1 === s2) return 100;
-
   const longer = s1.length > s2.length ? s1 : s2;
   const shorter = s1.length > s2.length ? s2 : s1;
-
   if (longer.length === 0) return 100;
-
-  const editDistance = getEditDistance(longer, shorter);
-  return Math.round(((longer.length - editDistance) / longer.length) * 100);
-};
-
-/**
- * Calculate Levenshtein distance between two strings
- */
-const getEditDistance = (s1, s2) => {
   const costs = [];
-  for (let i = 0; i <= s1.length; i++) {
+  for (let i = 0; i <= longer.length; i++) {
     let lastValue = i;
-    for (let j = 0; j <= s2.length; j++) {
-      if (i === 0) {
-        costs[j] = j;
-      } else if (j > 0) {
+    for (let j = 0; j <= shorter.length; j++) {
+      if (i === 0) costs[j] = j;
+      else if (j > 0) {
         let newValue = costs[j - 1];
-        if (s1.charAt(i - 1) !== s2.charAt(j - 1)) {
+        if (longer.charAt(i - 1) !== shorter.charAt(j - 1)) {
           newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
         }
         costs[j - 1] = lastValue;
         lastValue = newValue;
       }
     }
-    if (i > 0) costs[s2.length] = lastValue;
+    if (i > 0) costs[shorter.length] = lastValue;
   }
-  return costs[s2.length];
+  return Math.round(((longer.length - costs[shorter.length]) / longer.length) * 100);
 };
 
 /**
  * Find potential duplicate DC listings
  */
 const findDuplicateDcListings = async ({
-  organizationId, location, googleMapsLink, companyLegalEntity,
+  supplierId, location, googleMapsLink, companyLegalEntity,
 }) => {
   const duplicates = [];
 
-  // GPS proximity check (50-100 meters)
+  const allListings = await prisma.listing.findMany({
+    where: {
+      type: 'DC_SITE',
+      supplier_id: { not: supplierId },
+      archived_at: null
+    }
+  });
+
+  // GPS proximity check
   if (googleMapsLink) {
     const coords = extractCoordinates(googleMapsLink);
     if (coords) {
-      const allListings = await DcApplication.find({
-        organizationId: { $ne: organizationId },
-        isArchived: false,
-      }).lean();
-
       for (const listing of allListings) {
-        if (listing.googleMapsLink) {
-          const otherCoords = extractCoordinates(listing.googleMapsLink);
+        const otherLink = listing.specifications?.googleMapsLink || listing.metadata?.googleMapsLink;
+        if (otherLink) {
+          const otherCoords = extractCoordinates(otherLink);
           if (otherCoords) {
-            const distance = calculateDistance(
-              coords.lat, coords.lng,
-              otherCoords.lat, otherCoords.lng,
-            );
-
-            if (distance <= 100) { // 100 meters proximity threshold
+            const distance = calculateDistance(coords.lat, coords.lng, otherCoords.lat, otherCoords.lng);
+            if (distance <= 100) {
               duplicates.push({
-                id: listing._id,
+                id: listing.id,
+                _id: listing.id,
                 type: 'GPS_PROXIMITY',
                 distance: Math.round(distance),
-                similarity: 95, // High similarity for same location
-                name: listing.companyLegalEntity,
-                location: listing.location || 'Unknown',
+                similarity: 95,
+                name: listing.data_center_name || listing.name,
+                location: listing.city + ', ' + listing.country,
                 reason: `Same location (${Math.round(distance)}m away)`,
               });
             }
@@ -135,95 +113,77 @@ const findDuplicateDcListings = async ({
   }
 
   // Field matching check
-  const allListings = await DcApplication.find({
-    organizationId: { $ne: organizationId },
-    isArchived: false,
-  }).lean();
-
   for (const listing of allListings) {
     let similarityScore = 0;
     const matchedFields = [];
 
-    // Check company name
-    if (companyLegalEntity && listing.companyLegalEntity) {
-      const nameSimilarity = calculateStringSimilarity(companyLegalEntity, listing.companyLegalEntity);
+    if (companyLegalEntity && (listing.data_center_name || listing.name)) {
+      const nameSimilarity = calculateStringSimilarity(companyLegalEntity, listing.data_center_name || listing.name);
       if (nameSimilarity >= 80) {
         similarityScore += 40;
         matchedFields.push('companyName');
       }
     }
 
-    // Check location
-    if (location && listing.location) {
-      const locationSimilarity = calculateStringSimilarity(location, listing.location);
-      if (locationSimilarity >= 90) {
+    if (location && (listing.city || listing.state)) {
+      const locSimilarity = calculateStringSimilarity(location, (listing.city || '') + ' ' + (listing.state || ''));
+      if (locSimilarity >= 90) {
         similarityScore += 30;
         matchedFields.push('location');
       }
     }
 
-    // Check country
-    if (listing.companyCountry) {
-      const countrySimilarity = calculateStringSimilarity(listing.companyCountry, listing.companyCountry);
-      if (countrySimilarity === 100) {
-        similarityScore += 20;
-        matchedFields.push('country');
-      }
-    }
-
-    // If significant similarity found, add to duplicates
-    if (similarityScore >= 70 && !duplicates.some((d) => d.id === listing._id)) {
+    if (similarityScore >= 70 && !duplicates.some((d) => d.id === listing.id)) {
       duplicates.push({
-        id: listing._id,
+        id: listing.id,
+        _id: listing.id,
         type: 'FIELD_MATCHING',
         similarity: similarityScore,
-        name: listing.companyLegalEntity,
-        location: listing.location || 'Unknown',
+        name: listing.data_center_name || listing.name,
+        location: listing.city || 'Unknown',
         reason: `${matchedFields.join(', ')} match`,
       });
     }
   }
 
-  // Sort by similarity and remove duplicates
-  return duplicates
-    .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, 10); // Return top 10 matches
+  return duplicates.sort((a, b) => b.similarity - a.similarity).slice(0, 10);
 };
 
 /**
  * Find potential duplicate GPU listings
  */
 const findDuplicateGpuListings = async ({
-  organizationId, location, googleMapsLink, vendorName, gpu,
+  supplierId, location, googleMapsLink, vendorName, gpu,
 }) => {
   const duplicates = [];
+
+  const allListings = await prisma.listing.findMany({
+    where: {
+      type: 'GPU_CLUSTER',
+      supplier_id: { not: supplierId },
+      archived_at: null
+    }
+  });
 
   // GPS proximity check
   if (googleMapsLink) {
     const coords = extractCoordinates(googleMapsLink);
     if (coords) {
-      const allListings = await GpuClusterListing.find({
-        organizationId: { $ne: organizationId },
-        isArchived: false,
-      }).lean();
-
       for (const listing of allListings) {
-        if (listing.googleMapsLink) {
-          const otherCoords = extractCoordinates(listing.googleMapsLink);
+        const otherLink = listing.specifications?.googleMapsLink || listing.metadata?.googleMapsLink;
+        if (otherLink) {
+          const otherCoords = extractCoordinates(otherLink);
           if (otherCoords) {
-            const distance = calculateDistance(
-              coords.lat, coords.lng,
-              otherCoords.lat, otherCoords.lng,
-            );
-
+            const distance = calculateDistance(coords.lat, coords.lng, otherCoords.lat, otherCoords.lng);
             if (distance <= 100) {
               duplicates.push({
-                id: listing._id,
+                id: listing.id,
+                _id: listing.id,
                 type: 'GPS_PROXIMITY',
                 distance: Math.round(distance),
                 similarity: 95,
-                name: listing.vendorName,
-                location: listing.location || 'Unknown',
+                name: listing.name || listing.data_center_name,
+                location: listing.city || 'Unknown',
                 reason: `Same location (${Math.round(distance)}m away)`,
               });
             }
@@ -233,56 +193,33 @@ const findDuplicateGpuListings = async ({
     }
   }
 
-  // Field matching check
-  const allListings = await GpuClusterListing.find({
-    organizationId: { $ne: organizationId },
-    isArchived: false,
-  }).lean();
-
+  // Field matching
   for (const listing of allListings) {
-    // Use advanced fuzzy matching for AI-based similarity scoring
     const aiScore = advancedFuzzyMatch({
       vendorName,
-      vendorName2: listing.vendorName,
+      vendorName2: listing.name || listing.data_center_name,
       gpu,
-      gpu2: listing.gpu,
+      gpu2: listing.specifications?.gpuModel || listing.metadata?.gpuModel,
       location,
-      location2: listing.location,
-      powerMw: null, // Not available in this context
+      location2: (listing.city || '') + ' ' + (listing.country || ''),
+      powerMw: null,
       powerMw2: null,
     });
 
-    // Also do traditional field matching for detailed reasons
-    const matchedFields = [];
-    if (vendorName && listing.vendorName) {
-      const vendorSimilarity = calculateStringSimilarity(vendorName, listing.vendorName);
-      if (vendorSimilarity >= 75) matchedFields.push('vendorName');
-    }
-    if (gpu && listing.gpu) {
-      const gpuSimilarity = calculateStringSimilarity(gpu, listing.gpu);
-      if (gpuSimilarity >= 80) matchedFields.push('gpu');
-    }
-    if (location && listing.location) {
-      const locationSimilarity = calculateStringSimilarity(location, listing.location);
-      if (locationSimilarity >= 85) matchedFields.push('location');
-    }
-
-    // Use AI score, fallback to traditional scoring
-    if (aiScore >= 70 && !duplicates.some((d) => d.id === listing._id)) {
+    if (aiScore >= 70 && !duplicates.some((d) => d.id === listing.id)) {
       duplicates.push({
-        id: listing._id,
+        id: listing.id,
+        _id: listing.id,
         type: 'AI_FIELD_MATCHING',
         similarity: aiScore,
-        name: listing.vendorName,
-        location: listing.location || 'Unknown',
-        reason: matchedFields.length > 0 ? `${matchedFields.join(', ')} match` : 'AI similarity detected',
+        name: listing.name || listing.data_center_name,
+        location: listing.city || 'Unknown',
+        reason: 'AI similarity detected',
       });
     }
   }
 
-  return duplicates
-    .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, 10);
+  return duplicates.sort((a, b) => b.similarity - a.similarity).slice(0, 10);
 };
 
 module.exports = {

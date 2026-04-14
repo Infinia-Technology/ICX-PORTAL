@@ -80,7 +80,7 @@ export default function InventoryPage() {
   const load = () => {
     Promise.all([
       api.get('/inventory?limit=1000'),
-      api.get('/gpu-clusters?limit=1000'),
+      api.get('/admin/gpu-clusters?limit=1000'),
       api.get('/admin/customers'),
     ])
       .then(([invRes, clusterRes, custRes]) => {

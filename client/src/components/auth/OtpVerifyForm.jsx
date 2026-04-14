@@ -11,6 +11,7 @@ export default function OtpVerifyForm({ email, onVerified, onBack }) {
   const [cooldown, setCooldown] = useState(INITIAL_COOLDOWN);
   const { loading, post } = useApi();
   const [resending, setResending] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const inputRefs = useRef([]);
 
   useEffect(() => {
@@ -59,7 +60,10 @@ export default function OtpVerifyForm({ email, onVerified, onBack }) {
     }
 
     try {
-      const data = await post('/auth/otp/verify', { email, code: fullCode });
+      const data = await post('/auth/otp/verify', { email, code: fullCode, rememberMe });
+      if (rememberMe) {
+        localStorage.setItem('icx_remember_me', 'true');
+      }
       onVerified(data);
     } catch (err) {
       const msg = err.response?.data?.error || 'Verification failed';
@@ -119,6 +123,16 @@ export default function OtpVerifyForm({ email, onVerified, onBack }) {
 
       {error && <p className="text-sm text-[var(--color-error)] text-center">{error}</p>}
       {resendMsg && <p className="text-sm text-green-600 text-center">{resendMsg}</p>}
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={rememberMe}
+          onChange={(e) => setRememberMe(e.target.checked)}
+          className="w-4 h-4 rounded border-[var(--color-border)]"
+        />
+        <span className="text-sm text-[var(--color-text-secondary)]">Remember me on this device</span>
+      </label>
 
       <Button type="submit" loading={loading} className="w-full">
         Verify Code

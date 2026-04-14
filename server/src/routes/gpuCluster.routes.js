@@ -6,6 +6,7 @@ const upload = require('../middleware/upload');
 const {
   listClusters, createCluster, getCluster, updateCluster,
   submitCluster, resubmitCluster, uploadDocument, deleteDocument,
+  refreshCluster,
 } = require('../controllers/gpuCluster.controller');
 
 router.use(authenticate);
@@ -18,5 +19,6 @@ router.post('/:id/submit', authorize('supplier', 'broker'), submitCluster);
 router.post('/:id/resubmit', authorize('supplier', 'broker'), resubmitCluster);
 router.post('/:id/documents', authorize('supplier', 'broker', 'subordinate'), upload.single('file'), uploadDocument);
 router.delete('/:id/documents/:docId', authorize('supplier', 'broker'), deleteDocument);
+router.post('/:id/refresh', authorize('supplier', 'broker'), refreshCluster);
 
 module.exports = router;

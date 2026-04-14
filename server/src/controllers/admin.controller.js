@@ -1,31 +1,43 @@
-const Organization = require('../models/Organization');
-const User = require('../models/User');
-const QueueItem = require('../models/QueueItem');
-const DcApplication = require('../models/DcApplication');
-const DcSite = require('../models/DcSite');
-const DcDocument = require('../models/DcDocument');
-const GpuClusterListing = require('../models/GpuClusterListing');
-const GpuClusterDocument = require('../models/GpuClusterDocument');
-const GpuDemandRequest = require('../models/GpuDemandRequest');
-const DcCapacityRequest = require('../models/DcCapacityRequest');
-const Notification = require('../models/Notification');
+const prisma = require('../config/prisma');
 const { logAction } = require('../services/audit.service');
-const { sendKycApproved, sendKycRejected, sendRevisionRequested, sendEmail } = require('../services/email.service');
-const { paginate } = require('../utils/pagination');
+const { sendEmail } = require('../services/email.service');
+
+// Helper for Prisma pagination
+const paginatePrisma = async (model, where, page, limit, include = null, orderBy = { created_at: 'desc' }) => {
+  const pageNum = parseInt(page) || 1;
+  const limitNum = parseInt(limit) || 20;
+  const count = await model.count({ where });
+  const docs = await model.findMany({
+    where,
+    take: limitNum,
+    skip: (pageNum - 1) * limitNum,
+    orderBy,
+    include
+  });
+  return {
+    data: docs,
+    total: count,
+    limit: limitNum,
+    page: pageNum,
+    totalPages: Math.ceil(count / limitNum),
+    hasNext: pageNum < Math.ceil(count / limitNum),
+    hasPrev: pageNum > 1,
+  };
+};
 
 // ======================= QUEUE =======================
 
 // GET /api/admin/queue
 const getQueue = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, type, status, sort = '-createdAt' } = req.query;
-    const filter = {};
-    if (type) filter.type = type;
-    if (status) filter.status = status;
+    const { page = 1, limit = 20, type, status } = req.query;
+    const where = {};
+    if (type) where.type = type;
+    if (status) where.status = status;
 
-    const result = await paginate(QueueItem, filter, {
-      page: parseInt(page), limit: parseInt(limit), sort,
-      populate: [{ path: 'assignedTo', select: 'email role' }],
+    const result = await paginatePrisma(prisma.queueItem, where, page, limit, {
+      assigned_to: { select: { email: true, role: true } },
+      listing: true
     });
     res.json(result);
   } catch (err) { next(err); }
@@ -34,28 +46,25 @@ const getQueue = async (req, res, next) => {
 // GET /api/admin/queue/:id
 const getQueueItem = async (req, res, next) => {
   try {
-    const item = await QueueItem.findById(req.params.id).populate('assignedTo', 'email role');
+    const item = await prisma.queueItem.findUnique({
+      where: { id: req.params.id },
+      include: { assigned_to: { select: { email: true, role: true } } }
+    });
     if (!item) return res.status(404).json({ error: 'Queue item not found' });
 
-    // Fetch the referenced entity
     let entity = null;
-    if (item.referenceModel === 'Organization') {
-      entity = await Organization.findById(item.referenceId);
-    } else if (item.referenceModel === 'DcApplication') {
-      entity = await DcApplication.findById(item.referenceId);
-      if (entity) {
-        const sites = await DcSite.find({ dcApplicationId: entity._id });
-        entity = { ...entity.toObject(), sites };
-      }
-    } else if (item.referenceModel === 'GpuClusterListing') {
-      entity = await GpuClusterListing.findById(item.referenceId);
-    } else if (item.referenceModel === 'GpuDemandRequest') {
-      entity = await GpuDemandRequest.findById(item.referenceId);
-    } else if (item.referenceModel === 'DcCapacityRequest') {
-      entity = await DcCapacityRequest.findById(item.referenceId);
+    if (item.reference_model === 'Organization') {
+      entity = await prisma.organization.findUnique({ where: { id: item.reference_id } });
+    } else if (item.reference_model === 'Listing' || item.reference_model === 'DcApplication') {
+      entity = await prisma.listing.findUnique({
+        where: { id: item.reference_id },
+        include: { sites: { include: { documents: true, phasing: true } } }
+      });
+    } else if (item.reference_model === 'Inquiry') {
+      entity = await prisma.inquiry.findUnique({ where: { id: item.reference_id } });
     }
 
-    res.json({ ...item.toObject(), entity });
+    res.json({ ...item, entity });
   } catch (err) { next(err); }
 };
 
@@ -65,13 +74,23 @@ const getQueueItem = async (req, res, next) => {
 const getSuppliers = async (req, res, next) => {
   try {
     const { page = 1, limit = 20, status, type } = req.query;
-    const filter = { type: { $in: ['SUPPLIER', 'BROKER'] } };
-    if (status) filter.status = status;
-    if (type) filter.type = type;
+    const where = { type: { in: ['SUPPLIER', 'BROKER'] } };
+    if (status) where.status = status.toUpperCase();
+    if (type) where.type = type.toUpperCase();
 
-    const result = await paginate(Organization, filter, {
-      page: parseInt(page), limit: parseInt(limit), sort: '-createdAt',
-    });
+    const result = await paginatePrisma(prisma.organization, where, page, limit);
+
+    // Map database fields to frontend camelCase
+    result.data = result.data.map(org => ({
+      ...org,
+      _id: org.id,
+      contactEmail: org.contact_email,
+      vendorType: org.vendor_type,
+      mandateStatus: org.mandate_status,
+      createdAt: org.created_at,
+      updatedAt: org.updated_at
+    }));
+
     res.json(result);
   } catch (err) { next(err); }
 };
@@ -79,36 +98,33 @@ const getSuppliers = async (req, res, next) => {
 // GET /api/admin/suppliers/:id
 const getSupplier = async (req, res, next) => {
   try {
-    const org = await Organization.findById(req.params.id);
-    if (!org || !['SUPPLIER', 'BROKER'].includes(org.type)) {
-      return res.status(404).json({ error: 'Supplier not found' });
-    }
-    const users = await User.find({ organizationId: org._id }).select('email role isActive lastLoginAt');
+    const org = await prisma.organization.findUnique({
+      where: { id: req.params.id },
+      include: {
+        users: { select: { id: true, email: true, role: true, isActive: true } },
+        _count: { select: { listings: true } }
+      }
+    });
+    if (!org) return res.status(404).json({ error: 'Supplier not found' });
 
-    // Get listing statistics
-    const dcListings = await DcApplication.find({ organizationId: org._id });
-    const gpuListings = await GpuClusterListing.find({ organizationId: org._id });
-
-    const dcStats = {
-      total: dcListings.length,
-      approved: dcListings.filter((l) => l.status === 'APPROVED').length,
-      draft: dcListings.filter((l) => l.status === 'DRAFT').length,
-      pending: dcListings.filter((l) => ['SUBMITTED', 'IN_REVIEW', 'RESUBMITTED'].includes(l.status)).length,
-      archived: dcListings.filter((l) => l.isArchived).length,
-    };
-
-    const gpuStats = {
-      total: gpuListings.length,
-      approved: gpuListings.filter((l) => l.status === 'APPROVED').length,
-      draft: gpuListings.filter((l) => l.status === 'DRAFT').length,
-      pending: gpuListings.filter((l) => ['SUBMITTED', 'IN_REVIEW', 'RESUBMITTED'].includes(l.status)).length,
-      archived: gpuListings.filter((l) => l.isArchived).length,
-    };
+    const listings = await prisma.listing.findMany({ where: { organization_id: org.id } });
+    
+    const stats = (type) => ({
+      total: listings.filter(l => l.type === type).length,
+      approved: listings.filter(l => l.type === type && l.status === 'APPROVED').length,
+      pending: listings.filter(l => l.type === type && ['SUBMITTED', 'IN_REVIEW'].includes(l.status)).length,
+      archived: listings.filter(l => l.type === type && l.status === 'ARCHIVED').length
+    });
 
     res.json({
-      ...org.toObject(),
-      users,
-      listingStats: { dc: dcStats, gpu: gpuStats },
+      ...org,
+      _id: org.id,
+      contactEmail: org.contact_email,
+      vendorType: org.vendor_type,
+      mandateStatus: org.mandate_status,
+      createdAt: org.created_at,
+      updatedAt: org.updated_at,
+      listingStats: { dc: stats('DC_SITE'), gpu: stats('GPU_CLUSTER') }
     });
   } catch (err) { next(err); }
 };
@@ -117,267 +133,117 @@ const getSupplier = async (req, res, next) => {
 const reviewSupplierKyc = async (req, res, next) => {
   try {
     const { action, flaggedFields = [], fieldComments = {}, reason } = req.body;
-    if (!['APPROVE', 'REJECT', 'REQUEST_REVISION'].includes(action)) {
-      return res.status(400).json({ error: 'action must be APPROVE, REJECT, or REQUEST_REVISION' });
-    }
-
-    const org = await Organization.findById(req.params.id);
+    const org = await prisma.organization.findUnique({ where: { id: req.params.id } });
     if (!org) return res.status(404).json({ error: 'Supplier not found' });
 
-    const user = await User.findOne({ organizationId: org._id });
+    let status = 'PENDING';
+    if (action === 'APPROVE') status = 'APPROVED';
+    else if (action === 'REJECT') status = 'REJECTED';
+    else if (action === 'REQUEST_REVISION') status = 'REVISION_REQUESTED';
 
-    if (action === 'APPROVE') {
-      org.status = 'APPROVED';
-      org.reviewedBy = req.user.userId;
-      org.approvedAt = new Date();
-      org.flaggedFields = [];
-      org.fieldComments = new Map();
-      await org.save();
-
-      if (user) {
-        await sendKycApproved(user.email).catch(console.error);
-        await Notification.create({
-          userId: user._id, type: 'KYC_APPROVED', title: 'Account Approved',
-          message: 'Your KYC has been approved. You can now create listings.',
-          link: '/supplier/dashboard',
-        });
+    const updated = await prisma.organization.update({
+      where: { id: org.id },
+      data: {
+        status,
+        flagged_fields: flaggedFields,
+        field_comments: fieldComments,
+        reviewed_by: req.user.userId,
+        approved_at: action === 'APPROVE' ? new Date() : undefined
       }
-    } else if (action === 'REJECT') {
-      org.status = 'REJECTED';
-      org.reviewedBy = req.user.userId;
-      await org.save();
-
-      if (user) {
-        await sendKycRejected(user.email, reason).catch(console.error);
-        await Notification.create({
-          userId: user._id, type: 'KYC_REJECTED', title: 'Application Rejected',
-          message: reason || 'Your KYC application has been rejected.',
-          link: '/supplier/dashboard',
-        });
-      }
-    } else {
-      org.status = 'REVISION_REQUESTED';
-      org.flaggedFields = flaggedFields;
-      org.fieldComments = fieldComments;
-      org.reviewedBy = req.user.userId;
-      await org.save();
-
-      if (user) {
-        await sendRevisionRequested(user.email, flaggedFields).catch(console.error);
-        await Notification.create({
-          userId: user._id, type: 'KYC_REVISION_REQUESTED', title: 'Revision Requested',
-          message: 'Please update your KYC information and resubmit.',
-          link: '/supplier/dashboard',
-        });
-      }
-    }
-
-    await logAction({ userId: req.user.userId, action: `KYC_${action}`, targetModel: 'Organization', targetId: org._id, ipAddress: req.ip });
-    res.json({ message: `KYC ${action.toLowerCase().replace('_', ' ')} successfully`, status: org.status });
-  } catch (err) { next(err); }
-};
-
-// ======================= DC LISTINGS =======================
-
-// GET /api/admin/dc-listings
-const getDcListings = async (req, res, next) => {
-  try {
-    const { page = 1, limit = 20, status, includeArchived = false } = req.query;
-    const filter = {};
-    if (status) filter.status = status;
-    if (includeArchived !== 'true') filter.isArchived = false;
-
-    const result = await paginate(DcApplication, filter, {
-      page: parseInt(page), limit: parseInt(limit), sort: '-createdAt',
-      populate: [{ path: 'organizationId', select: 'type status contactEmail companyName' }],
     });
 
-    // Add draft duration calculation
-    result.data = result.data.map((item) => {
-      const obj = item.toObject ? item.toObject() : item;
-      if (obj.status === 'DRAFT') {
-        const daysOld = Math.floor(
-          (new Date() - new Date(obj.createdAt)) / (1000 * 60 * 60 * 24),
-        );
-        obj.draftDurationDays = daysOld;
-      }
-      return obj;
-    });
-
-    res.json(result);
-  } catch (err) { next(err); }
-};
-
-// GET /api/admin/dc-listings/:id
-const getDcListing = async (req, res, next) => {
-  try {
-    const app = await DcApplication.findById(req.params.id)
-      .populate('organizationId', 'type status contactEmail vendorType')
-      .populate('assignedTo', 'email role');
-    if (!app) return res.status(404).json({ error: 'DC listing not found' });
-
-    const sites = await DcSite.find({ dcApplicationId: app._id });
-    const sitesWithDocs = await Promise.all(sites.map(async (site) => {
-      const documents = await DcDocument.find({ dcSiteId: site._id });
-      return { ...site.toObject(), documents };
-    }));
-
-    res.json({ ...app.toObject(), sites: sitesWithDocs });
-  } catch (err) { next(err); }
-};
-
-// PUT /api/admin/dc-listings/:id/review
-const reviewDcListing = async (req, res, next) => {
-  try {
-    const { action, flaggedFields = [], fieldComments = {}, reason } = req.body;
-    if (!['APPROVE', 'REJECT', 'REQUEST_REVISION'].includes(action)) {
-      return res.status(400).json({ error: 'Invalid action' });
-    }
-
-    const app = await DcApplication.findById(req.params.id);
-    if (!app) return res.status(404).json({ error: 'DC listing not found' });
-
-    const supplierUser = await User.findOne({ organizationId: app.organizationId });
-
-    if (action === 'APPROVE') {
-      app.status = 'APPROVED';
-      app.reviewedAt = new Date();
-      await app.save();
-      await DcSite.updateMany({ dcApplicationId: app._id }, { $set: { flaggedFields: [], fieldComments: new Map() } });
-
-      if (supplierUser) {
-        await sendEmail(supplierUser.email, 'ICX Portal — DC Listing Approved', `
-          <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
-            <h2>ICX Portal</h2><p>Your DC listing has been <strong>approved</strong> and is now live on the marketplace.</p>
-          </div>`).catch(console.error);
-        await Notification.create({
-          userId: supplierUser._id, type: 'DC_LISTING_APPROVED', title: 'DC Listing Approved',
-          message: 'Your DC listing is now live on the marketplace.',
-          link: `/supplier/dc-listings/${app._id}`,
-        });
-      }
-    } else if (action === 'REJECT') {
-      app.status = 'REJECTED';
-      app.reviewedAt = new Date();
-      await app.save();
-
-      if (supplierUser) {
-        await Notification.create({
-          userId: supplierUser._id, type: 'DC_LISTING_REJECTED', title: 'DC Listing Rejected',
-          message: reason || 'Your DC listing has been rejected.',
-          link: `/supplier/dc-listings/${app._id}`,
-        });
-      }
-    } else {
-      app.status = 'REVISION_REQUESTED';
-      app.reviewedAt = new Date();
-      await app.save();
-
-      // Store flagged fields on the first site (or the specific site specified)
-      if (flaggedFields.length > 0) {
-        await DcSite.updateMany({ dcApplicationId: app._id }, { $set: { flaggedFields, fieldComments } });
-      }
-
-      if (supplierUser) {
-        await sendRevisionRequested(supplierUser.email, flaggedFields).catch(console.error);
-        await Notification.create({
-          userId: supplierUser._id, type: 'DC_LISTING_REVISION', title: 'Revision Requested',
-          message: 'Your DC listing requires revisions.',
-          link: `/supplier/dc-listings/${app._id}/edit`,
-        });
-      }
-    }
-
-    await logAction({ userId: req.user.userId, action: `DC_LISTING_${action}`, targetModel: 'DcApplication', targetId: app._id, ipAddress: req.ip });
-    res.json({ message: `DC listing ${action.toLowerCase().replace('_', ' ')}`, status: app.status });
-  } catch (err) { next(err); }
-};
-
-// ======================= GPU CLUSTERS =======================
-
-// GET /api/admin/gpu-clusters
-const getGpuClusters = async (req, res, next) => {
-  try {
-    const { page = 1, limit = 20, status, includeArchived = false } = req.query;
-    const filter = {};
-    if (status) filter.status = status;
-    if (includeArchived !== 'true') filter.isArchived = false;
-
-    const result = await paginate(GpuClusterListing, filter, {
-      page: parseInt(page), limit: parseInt(limit), sort: '-createdAt',
-      populate: [{ path: 'organizationId', select: 'type status contactEmail companyName' }],
-    });
-
-    // Add draft duration calculation
-    result.data = result.data.map((item) => {
-      const obj = item.toObject ? item.toObject() : item;
-      if (obj.status === 'DRAFT') {
-        const daysOld = Math.floor(
-          (new Date() - new Date(obj.createdAt)) / (1000 * 60 * 60 * 24),
-        );
-        obj.draftDurationDays = daysOld;
-      }
-      return obj;
-    });
-
-    res.json(result);
-  } catch (err) { next(err); }
-};
-
-// GET /api/admin/gpu-clusters/:id
-const getGpuCluster = async (req, res, next) => {
-  try {
-    const cluster = await GpuClusterListing.findById(req.params.id)
-      .populate('organizationId', 'type status contactEmail')
-      .populate('assignedTo', 'email role');
-    if (!cluster) return res.status(404).json({ error: 'GPU cluster not found' });
-
-    const documents = await GpuClusterDocument.find({ gpuClusterListingId: cluster._id });
-    res.json({ ...cluster.toObject(), documents });
-  } catch (err) { next(err); }
-};
-
-// PUT /api/admin/gpu-clusters/:id/review
-const reviewGpuCluster = async (req, res, next) => {
-  try {
-    const { action, flaggedFields = [], fieldComments = {}, reason } = req.body;
-    if (!['APPROVE', 'REJECT', 'REQUEST_REVISION'].includes(action)) {
-      return res.status(400).json({ error: 'Invalid action' });
-    }
-
-    const cluster = await GpuClusterListing.findById(req.params.id);
-    if (!cluster) return res.status(404).json({ error: 'GPU cluster not found' });
-
-    const supplierUser = await User.findOne({ organizationId: cluster.organizationId });
-
-    if (action === 'APPROVE') {
-      cluster.status = 'APPROVED';
-      cluster.reviewedAt = new Date();
-      cluster.flaggedFields = [];
-      cluster.fieldComments = new Map();
-    } else if (action === 'REJECT') {
-      cluster.status = 'REJECTED';
-      cluster.reviewedAt = new Date();
-    } else {
-      cluster.status = 'REVISION_REQUESTED';
-      cluster.reviewedAt = new Date();
-      cluster.flaggedFields = flaggedFields;
-      cluster.fieldComments = fieldComments;
-    }
-    await cluster.save();
-
-    if (supplierUser) {
-      const notifTypes = { APPROVE: 'GPU_CLUSTER_APPROVED', REJECT: 'GPU_CLUSTER_REJECTED', REQUEST_REVISION: 'GPU_CLUSTER_REVISION' };
-      const titles = { APPROVE: 'GPU Cluster Approved', REJECT: 'GPU Cluster Rejected', REQUEST_REVISION: 'Revision Requested' };
-      await Notification.create({
-        userId: supplierUser._id, type: notifTypes[action], title: titles[action],
-        message: action === 'APPROVE' ? 'Your GPU cluster is live on the marketplace.' : (reason || `GPU cluster ${action.toLowerCase()}`),
-        link: `/supplier/gpu-clusters/${cluster._id}`,
+    // Notify users in the organization
+    const users = await prisma.user.findMany({ where: { organization_id: org.id } });
+    for (const user of users) {
+      await prisma.notification.create({
+        data: {
+          user_id: user.id,
+          type: `KYC_${action}`,
+          title: `KYC ${status.replace('_', ' ')}`,
+          message: reason || `Your KYC application has been ${status.toLowerCase().replace('_', ' ')}.`,
+          link: '/supplier/dashboard'
+        }
       });
     }
 
-    await logAction({ userId: req.user.userId, action: `GPU_CLUSTER_${action}`, targetModel: 'GpuClusterListing', targetId: cluster._id, ipAddress: req.ip });
-    res.json({ message: `GPU cluster ${action.toLowerCase()}`, status: cluster.status });
+    await logAction({ userId: req.user.userId, action: `KYC_${action}`, targetModel: 'Organization', targetId: org.id });
+    res.json({ message: `KYC ${action.toLowerCase()} successfully`, status: updated.status });
+  } catch (err) { next(err); }
+};
+
+// ======================= LISTINGS =======================
+
+// GET /api/admin/listings
+const getListings = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 20, type, status } = req.query;
+    const where = {};
+    if (type) where.type = type;
+    if (status) where.status = status.toUpperCase();
+
+    const result = await paginatePrisma(prisma.listing, where, page, limit, { organization: true });
+
+    // Map database fields to frontend camelCase
+    result.data = result.data.map(listing => ({
+      ...listing,
+      _id: listing.id,
+      companyLegalEntity: listing.organization?.company_name || listing.data_center_name || '—',
+      contactEmail: listing.organization?.contact_email || '—',
+      submittedAt: listing.created_at,
+      createdAt: listing.created_at,
+      updatedAt: listing.updated_at,
+      dataCenterName: listing.data_center_name,
+      totalUnits: listing.total_units,
+      availableUnits: listing.available_units,
+      isArchived: listing.archived_at ? true : false,
+      lastActivityAt: listing.updated_at
+    }));
+
+    res.json(result);
+  } catch (err) { next(err); }
+};
+
+// GET /api/admin/listings/:id
+const getListing = async (req, res, next) => {
+  try {
+    const listing = await prisma.listing.findUnique({
+      where: { id: req.params.id },
+      include: { organization: true, sites: { include: { documents: true, phasing: true } } }
+    });
+    if (!listing) return res.status(404).json({ error: 'Listing not found' });
+    res.json(listing);
+  } catch (err) { next(err); }
+};
+
+// PUT /api/admin/listings/:id/review
+const reviewListing = async (req, res, next) => {
+  try {
+    const { action, reason } = req.body;
+    const listing = await prisma.listing.findUnique({ where: { id: req.params.id } });
+    if (!listing) return res.status(404).json({ error: 'Listing not found' });
+
+    let status = 'IN_REVIEW';
+    if (action === 'APPROVE') status = 'APPROVED';
+    else if (action === 'REJECT') status = 'REJECTED';
+    else if (action === 'REQUEST_REVISION') status = 'REVISION_REQUESTED';
+
+    const updated = await prisma.listing.update({
+      where: { id: listing.id },
+      data: { status }
+    });
+
+    await prisma.notification.create({
+      data: {
+        user_id: listing.supplier_id,
+        type: `LISTING_${action}`,
+        title: `Listing ${status}`,
+        message: reason || `Your listing ${listing.data_center_name || listing.id} has been ${status.toLowerCase()}.`,
+        link: `/marketplace/listing/${listing.id}`
+      }
+    });
+
+    await logAction({ userId: req.user.userId, action: `LISTING_${action}`, targetModel: 'Listing', targetId: listing.id });
+    res.json({ message: `Listing ${action.toLowerCase()}`, status: updated.status });
   } catch (err) { next(err); }
 };
 
@@ -387,12 +253,10 @@ const reviewGpuCluster = async (req, res, next) => {
 const getCustomers = async (req, res, next) => {
   try {
     const { page = 1, limit = 20, status } = req.query;
-    const filter = { type: 'CUSTOMER' };
-    if (status) filter.status = status;
+    const where = { type: 'CUSTOMER' };
+    if (status) where.status = status.toUpperCase();
 
-    const result = await paginate(Organization, filter, {
-      page: parseInt(page), limit: parseInt(limit), sort: '-createdAt',
-    });
+    const result = await paginatePrisma(prisma.organization, where, page, limit);
     res.json(result);
   } catch (err) { next(err); }
 };
@@ -400,261 +264,220 @@ const getCustomers = async (req, res, next) => {
 // GET /api/admin/customers/:id
 const getCustomer = async (req, res, next) => {
   try {
-    const org = await Organization.findOne({ _id: req.params.id, type: 'CUSTOMER' });
+    const org = await prisma.organization.findUnique({
+      where: { id: req.params.id },
+      include: {
+        users: { select: { id: true, email: true, role: true, isActive: true } }
+      }
+    });
     if (!org) return res.status(404).json({ error: 'Customer not found' });
-    const users = await User.find({ organizationId: org._id }).select('email role isActive lastLoginAt');
-    res.json({ ...org.toObject(), users });
+    res.json(org);
   } catch (err) { next(err); }
 };
 
 // PUT /api/admin/customers/:id/verify
 const verifyCustomer = async (req, res, next) => {
   try {
-    const { action, reason, flaggedFields = [], fieldComments = {} } = req.body;
-    if (!['APPROVE', 'REJECT', 'REQUEST_REVISION'].includes(action)) {
-      return res.status(400).json({ error: 'Invalid action' });
-    }
-
-    const org = await Organization.findOne({ _id: req.params.id, type: 'CUSTOMER' });
-    if (!org) return res.status(404).json({ error: 'Customer not found' });
-
-    const user = await User.findOne({ organizationId: org._id });
-
-    if (action === 'APPROVE') {
-      org.status = 'APPROVED'; org.reviewedBy = req.user.userId; org.approvedAt = new Date();
-      await org.save();
-      if (user) {
-        await sendKycApproved(user.email).catch(console.error);
-        await Notification.create({ userId: user._id, type: 'KYC_APPROVED', title: 'Account Approved', message: 'Your account is approved. You can now browse the marketplace.', link: '/customer/marketplace' });
-      }
-    } else if (action === 'REJECT') {
-      org.status = 'REJECTED'; org.reviewedBy = req.user.userId; await org.save();
-      if (user) {
-        await sendKycRejected(user.email, reason).catch(console.error);
-        await Notification.create({ userId: user._id, type: 'KYC_REJECTED', title: 'Application Rejected', message: reason || 'Application rejected.', link: '/customer/dashboard' });
-      }
-    } else {
-      org.status = 'REVISION_REQUESTED'; org.flaggedFields = flaggedFields; org.fieldComments = fieldComments; await org.save();
-      if (user) {
-        await sendRevisionRequested(user.email, flaggedFields).catch(console.error);
-        await Notification.create({ userId: user._id, type: 'KYC_REVISION_REQUESTED', title: 'Revision Requested', message: 'Please update your profile and resubmit.', link: '/customer/dashboard' });
-      }
-    }
-
-    await logAction({ userId: req.user.userId, action: `CUSTOMER_${action}`, targetModel: 'Organization', targetId: org._id, ipAddress: req.ip });
-    res.json({ message: `Customer ${action.toLowerCase()}`, status: org.status });
+    const { status } = req.body;
+    const org = await prisma.organization.update({
+      where: { id: req.params.id },
+      data: { status: status.toUpperCase() }
+    });
+    res.json(org);
   } catch (err) { next(err); }
 };
 
-// ======================= DEMANDS & MATCHING =======================
+// ======================= INQUIRIES (Demands/Requests) =======================
 
-// GET /api/admin/gpu-demands
-const getAdminGpuDemands = async (req, res, next) => {
+const getAdminInquiries = (type) => async (req, res, next) => {
   try {
     const { page = 1, limit = 20, status } = req.query;
-    const filter = {};
-    if (status) filter.status = status;
-    const result = await paginate(GpuDemandRequest, filter, { page: parseInt(page), limit: parseInt(limit), sort: '-createdAt', populate: [{ path: 'organizationId', select: 'type status' }, { path: 'submittedBy', select: 'email' }] });
+    const where = { type };
+    if (status) where.status = status;
+
+    const result = await paginatePrisma(prisma.inquiry, where, page, limit, { organization: true });
     res.json(result);
   } catch (err) { next(err); }
 };
 
-// GET /api/admin/gpu-demands/:id
-const getAdminGpuDemand = async (req, res, next) => {
+const getAdminInquiry = async (req, res, next) => {
   try {
-    const demand = await GpuDemandRequest.findById(req.params.id).populate('organizationId').populate('submittedBy', 'email').populate('matchedClusterIds');
-    if (!demand) return res.status(404).json({ error: 'GPU demand not found' });
-    res.json(demand);
+    const inquiry = await prisma.inquiry.findUnique({
+      where: { id: req.params.id },
+      include: { organization: true }
+    });
+    if (!inquiry) return res.status(404).json({ error: 'Inquiry not found' });
+    res.json(inquiry);
   } catch (err) { next(err); }
 };
 
-// PUT /api/admin/gpu-demands/:id/match
-const matchGpuDemand = async (req, res, next) => {
+const matchInquiry = async (req, res, next) => {
   try {
-    const { clusterIds } = req.body;
-    const demand = await GpuDemandRequest.findByIdAndUpdate(req.params.id, { $set: { matchedClusterIds: clusterIds, status: 'MATCHED' } }, { new: true });
-    if (!demand) return res.status(404).json({ error: 'GPU demand not found' });
-
-    await logAction({ userId: req.user.userId, action: 'MATCH_GPU_DEMAND', targetModel: 'GpuDemandRequest', targetId: demand._id, changes: { clusterIds }, ipAddress: req.ip });
-    res.json(demand);
+    const { listingId } = req.body;
+    // Logic for matching could go here, for now just update status or log
+    const updated = await prisma.inquiry.update({
+      where: { id: req.params.id },
+      data: { status: 'MATCHED' }
+    });
+    res.json(updated);
   } catch (err) { next(err); }
 };
 
-// GET /api/admin/dc-requests
-const getAdminDcRequests = async (req, res, next) => {
-  try {
-    const { page = 1, limit = 20, status } = req.query;
-    const filter = {};
-    if (status) filter.status = status;
-    const result = await paginate(DcCapacityRequest, filter, { page: parseInt(page), limit: parseInt(limit), sort: '-createdAt', populate: [{ path: 'organizationId', select: 'type status' }, { path: 'submittedBy', select: 'email' }] });
-    res.json(result);
-  } catch (err) { next(err); }
-};
+// ======================= DOCUMENTATION =======================
 
-// GET /api/admin/dc-requests/:id
-const getAdminDcRequest = async (req, res, next) => {
-  try {
-    const request = await DcCapacityRequest.findById(req.params.id).populate('organizationId').populate('submittedBy', 'email').populate('matchedListingIds');
-    if (!request) return res.status(404).json({ error: 'DC request not found' });
-    res.json(request);
-  } catch (err) { next(err); }
-};
-
-// PUT /api/admin/dc-requests/:id/match
-const matchDcRequest = async (req, res, next) => {
-  try {
-    const { listingIds } = req.body;
-    const request = await DcCapacityRequest.findByIdAndUpdate(req.params.id, { $set: { matchedListingIds: listingIds, status: 'MATCHED' } }, { new: true });
-    if (!request) return res.status(404).json({ error: 'DC request not found' });
-
-    await logAction({ userId: req.user.userId, action: 'MATCH_DC_REQUEST', targetModel: 'DcCapacityRequest', targetId: request._id, changes: { listingIds }, ipAddress: req.ip });
-    res.json(request);
-  } catch (err) { next(err); }
-};
-
-// ======================= DOCUMENTS =======================
-
-// PUT /api/admin/documents/:docId/status
 const updateDocumentStatus = async (req, res, next) => {
   try {
-    const { received, reviewed, reviewComment } = req.body;
-
-    // Try DcDocument first, then GpuClusterDocument
-    let doc = await DcDocument.findByIdAndUpdate(req.params.docId, { $set: { received, reviewed, reviewComment } }, { new: true });
-    if (!doc) {
-      doc = await GpuClusterDocument.findByIdAndUpdate(req.params.docId, { $set: { received, reviewed, reviewComment } }, { new: true });
-    }
-    if (!doc) return res.status(404).json({ error: 'Document not found' });
-    res.json(doc);
+    const { status, comment } = req.body;
+    const updated = await prisma.dcDocument.update({
+      where: { id: req.params.docId },
+      data: { status, admin_comment: comment }
+    });
+    res.json(updated);
   } catch (err) { next(err); }
 };
 
 // ======================= ANALYTICS =======================
 
-// GET /api/admin/analytics
 const getAnalytics = async (req, res, next) => {
   try {
     const [
-      totalSuppliers, totalCustomers,
-      totalDcListings, approvedDcListings, pendingDcListings,
-      totalGpuClusters, approvedGpuClusters,
-      totalGpuDemands, totalDcRequests,
+      suppliers, customers,
+      dcListings, gpuClusters,
       pendingQueue,
+      totalMw
     ] = await Promise.all([
-      Organization.countDocuments({ type: { $in: ['SUPPLIER', 'BROKER'] }, status: 'APPROVED' }),
-      Organization.countDocuments({ type: 'CUSTOMER', status: 'APPROVED' }),
-      DcApplication.countDocuments(),
-      DcApplication.countDocuments({ status: 'APPROVED' }),
-      DcApplication.countDocuments({ status: { $in: ['SUBMITTED', 'IN_REVIEW', 'RESUBMITTED'] } }),
-      GpuClusterListing.countDocuments(),
-      GpuClusterListing.countDocuments({ status: 'APPROVED' }),
-      GpuDemandRequest.countDocuments(),
-      DcCapacityRequest.countDocuments(),
-      QueueItem.countDocuments({ status: { $in: ['NEW', 'IN_REVIEW', 'RESUBMITTED'] } }),
+      prisma.organization.count({ where: { type: 'SUPPLIER', status: 'APPROVED' } }),
+      prisma.organization.count({ where: { type: 'CUSTOMER', status: 'APPROVED' } }),
+      prisma.listing.count({ where: { type: 'DC_SITE', status: 'APPROVED' } }),
+      prisma.listing.count({ where: { type: 'GPU_CLUSTER', status: 'APPROVED' } }),
+      prisma.queueItem.count({ where: { status: { in: ['NEW', 'IN_REVIEW'] } } }),
+      prisma.listing.aggregate({
+        where: { type: 'DC_SITE', status: 'APPROVED' },
+        _sum: { total_mw: true }
+      })
     ]);
-
-    // MW totals from approved DC sites
-    const DcSiteModel = require('../models/DcSite');
-    const mwAgg = await DcSiteModel.aggregate([
-      { $lookup: { from: 'dcapplications', localField: 'dcApplicationId', foreignField: '_id', as: 'app' } },
-      { $match: { 'app.status': 'APPROVED' } },
-      { $group: { _id: null, totalMw: { $sum: '$totalItLoadMw' } } },
-    ]);
-    const totalApprovedMw = mwAgg[0]?.totalMw || 0;
 
     res.json({
-      totalSuppliers, totalCustomers,
-      totalDcListings, approvedDcListings, pendingDcListings,
-      totalGpuClusters, approvedGpuClusters,
-      totalGpuDemands, totalDcRequests,
-      pendingQueue, totalApprovedMw,
+      totalSuppliers: suppliers,
+      totalCustomers: customers,
+      approvedDcListings: dcListings,
+      approvedGpuClusters: gpuClusters,
+      pendingQueue,
+      totalApprovedMw: totalMw._sum.total_mw || 0
     });
   } catch (err) { next(err); }
 };
 
 // ======================= READERS =======================
 
-// GET /api/admin/readers
 const getReaders = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20 } = req.query;
-    const result = await paginate(User, { role: 'reader' }, {
-      page: parseInt(page), limit: parseInt(limit), sort: '-createdAt',
-    });
+    const result = await paginatePrisma(prisma.user, { role: 'reader' }, req.query.page, req.query.limit);
     res.json(result);
   } catch (err) { next(err); }
 };
 
-// POST /api/admin/readers
+const getReader = async (req, res, next) => {
+  try {
+    const reader = await prisma.user.findUnique({ where: { id: req.params.id, role: 'reader' } });
+    if (!reader) return res.status(404).json({ error: 'Reader not found' });
+    res.json(reader);
+  } catch (err) { next(err); }
+};
+
 const createReader = async (req, res, next) => {
   try {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ error: 'Email is required' });
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) return res.status(409).json({ error: 'User already exists' });
 
-    const existing = await User.findOne({ email });
-    if (existing) return res.status(409).json({ error: 'User with this email already exists' });
-
-    const reader = await User.create({ email, role: 'reader' });
-
-    await sendEmail(email, 'ICX Portal — Reader Access', `
-      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
-        <h2>ICX Portal</h2>
-        <p>You have been granted reader access to the ICX Portal marketplace.</p>
-        <a href="${process.env.CLIENT_URL}/login" style="display: inline-block; padding: 12px 24px; background: #1a1a2e; color: #fff; text-decoration: none; border-radius: 6px; margin-top: 16px;">Log In</a>
-      </div>`).catch(console.error);
-
-    await logAction({ userId: req.user.userId, action: 'CREATE_READER', targetModel: 'User', targetId: reader._id, ipAddress: req.ip });
+    const reader = await prisma.user.create({ data: { email, role: 'reader' } });
+    await sendEmail(email, 'Welcome to ICX Portal', 'You have been granted reader access.');
+    
+    await logAction({ userId: req.user.userId, action: 'CREATE_READER', targetModel: 'User', targetId: reader.id });
     res.status(201).json(reader);
   } catch (err) { next(err); }
 };
 
-// GET /api/admin/readers/:id
-const getReader = async (req, res, next) => {
-  try {
-    const reader = await User.findOne({ _id: req.params.id, role: 'reader' });
-    if (!reader) return res.status(404).json({ error: 'Reader not found' });
-    res.json(reader);
-  } catch (err) { next(err); }
-};
-
-// PUT /api/admin/readers/:id
 const updateReader = async (req, res, next) => {
   try {
-    const reader = await User.findOne({ _id: req.params.id, role: 'reader' });
-    if (!reader) return res.status(404).json({ error: 'Reader not found' });
-
-    if (req.body.isActive !== undefined) reader.isActive = req.body.isActive;
-    await reader.save();
-
-    await logAction({ userId: req.user.userId, action: 'UPDATE_READER', targetModel: 'User', targetId: reader._id, ipAddress: req.ip });
-    res.json(reader);
+    const { isActive } = req.body;
+    const updated = await prisma.user.update({
+      where: { id: req.params.id, role: 'reader' },
+      data: { isActive }
+    });
+    res.json(updated);
   } catch (err) { next(err); }
 };
 
-// DELETE /api/admin/readers/:id
 const deleteReader = async (req, res, next) => {
   try {
-    await User.deleteOne({ _id: req.params.id, role: 'reader' });
-    await logAction({ userId: req.user.userId, action: 'DELETE_READER', changes: { userId: req.params.id }, ipAddress: req.ip });
-    res.json({ message: 'Reader removed' });
+    await prisma.user.delete({ where: { id: req.params.id, role: 'reader' } });
+    res.status(204).end();
   } catch (err) { next(err); }
 };
 
-// POST /api/admin/readers/:id/resend
 const resendReaderWelcome = async (req, res, next) => {
   try {
-    const reader = await User.findOne({ _id: req.params.id, role: 'reader' });
+    const reader = await prisma.user.findUnique({ where: { id: req.params.id, role: 'reader' } });
     if (!reader) return res.status(404).json({ error: 'Reader not found' });
-
-    await sendEmail(reader.email, 'ICX Portal — Reader Access (Resent)', `
-      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
-        <h2>ICX Portal</h2><p>Your reader access to ICX Portal has been confirmed.</p>
-        <a href="${process.env.CLIENT_URL}/login" style="display: inline-block; padding: 12px 24px; background: #1a1a2e; color: #fff; text-decoration: none; border-radius: 6px; margin-top: 16px;">Log In</a>
-      </div>`).catch(console.error);
-
+    await sendEmail(reader.email, 'ICX Portal — Access Reminder', 'You have reader access to the portal.');
     res.json({ message: 'Welcome email resent' });
   } catch (err) { next(err); }
 };
+
+const getDcListings = (req, res, next) => {
+  req.query.type = 'DC_SITE';
+  return getListings(req, res, next);
+};
+
+const getGpuClusters = (req, res, next) => {
+  req.query.type = 'GPU_CLUSTER';
+  return getListings(req, res, next);
+};
+
+const getDcListing = async (req, res, next) => {
+  try {
+    const listing = await prisma.listing.findFirst({
+      where: { id: req.params.id, type: 'DC_SITE' },
+      include: { organization: true, sites: { include: { documents: true, phasing: true } } }
+    });
+    if (!listing) return res.status(404).json({ error: 'DC Listing not found' });
+    res.json({
+      ...listing,
+      _id: listing.id,
+      companyLegalEntity: listing.organization?.company_name || listing.data_center_name,
+      contactEmail: listing.organization?.contact_email,
+      dataCenterName: listing.data_center_name,
+      createdAt: listing.created_at,
+      updatedAt: listing.updated_at,
+      isArchived: listing.archived_at ? true : false
+    });
+  } catch (err) { next(err); }
+};
+
+const getGpuCluster = async (req, res, next) => {
+  try {
+    const listing = await prisma.listing.findFirst({
+      where: { id: req.params.id, type: 'GPU_CLUSTER' },
+      include: { organization: true }
+    });
+    if (!listing) return res.status(404).json({ error: 'GPU Cluster not found' });
+    res.json({
+      ...listing,
+      _id: listing.id,
+      companyLegalEntity: listing.organization?.company_name || listing.data_center_name,
+      contactEmail: listing.organization?.contact_email,
+      dataCenterName: listing.data_center_name,
+      createdAt: listing.created_at,
+      updatedAt: listing.updated_at,
+      isArchived: listing.archived_at ? true : false
+    });
+  } catch (err) { next(err); }
+};
+
+const reviewDcListing = (req, res, next) => reviewListing(req, res, next);
+const reviewGpuCluster = (req, res, next) => reviewListing(req, res, next);
 
 module.exports = {
   getQueue, getQueueItem,
@@ -662,9 +485,10 @@ module.exports = {
   getDcListings, getDcListing, reviewDcListing,
   getGpuClusters, getGpuCluster, reviewGpuCluster,
   getCustomers, getCustomer, verifyCustomer,
-  getAdminGpuDemands, getAdminGpuDemand, matchGpuDemand,
-  getAdminDcRequests, getAdminDcRequest, matchDcRequest,
+  getAdminGpuDemands: getAdminInquiries('GPU_DEMAND'), getAdminGpuDemand: getAdminInquiry, matchGpuDemand: matchInquiry,
+  getAdminDcRequests: getAdminInquiries('DC_REQUEST'), getAdminDcRequest: getAdminInquiry, matchDcRequest: matchInquiry,
   updateDocumentStatus,
   getAnalytics,
-  getReaders, createReader, getReader, updateReader, deleteReader, resendReaderWelcome,
+  getReaders, createReader, getReader, updateReader, deleteReader, resendReaderWelcome
 };
+

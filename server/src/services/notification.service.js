@@ -1,5 +1,4 @@
-const Notification = require('../models/Notification');
-const User = require('../models/User');
+const prisma = require('../config/prisma');
 const { sendNotificationEmail } = require('./email.service');
 
 /**
@@ -15,21 +14,20 @@ const createNotification = async ({
   link,
   sendEmail = false,
 }) => {
-  const notification = new Notification({
-    userId,
-    organizationId,
-    type,
-    title,
-    message,
-    actionData,
-    link,
+  const notification = await prisma.notification.create({
+    data: {
+      user_id: userId,
+      type,
+      title,
+      message,
+      metadata: actionData || null,
+      link,
+    }
   });
-
-  await notification.save();
 
   // Send email if requested
   if (sendEmail) {
-    const user = await User.findById(userId);
+    const user = await prisma.user.findUnique({ where: { id: userId } });
     if (user?.email) {
       try {
         await sendNotificationEmail({
@@ -38,9 +36,14 @@ const createNotification = async ({
           message,
           actionLink: link,
         });
-        notification.sentVia = ['in-app', 'email'];
-        notification.sentAt = new Date();
-        await notification.save();
+        
+        await prisma.notification.update({
+          where: { id: notification.id },
+          data: {
+            sent_via: ['in-app', 'email'],
+            updated_at: new Date(),
+          }
+        });
       } catch (err) {
         console.error(`Failed to send email notification to ${user.email}:`, err);
       }
@@ -131,8 +134,13 @@ const notifyListingArchived = async ({
 const notifyAdminsNewSubmission = async ({
   listingName, listingType, listingId, organizationName,
 }) => {
-  const admins = await User.find({ role: { $in: ['admin', 'superadmin'] }, isActive: true });
-  const adminIds = admins.map((a) => a._id);
+  const admins = await prisma.user.findMany({
+    where: {
+      role: { in: ['admin', 'superadmin'] },
+      isActive: true
+    }
+  });
+  const adminIds = admins.map((a) => a.id);
 
   const notificationData = {
     type: 'NEW_SUBMISSION',
@@ -168,28 +176,29 @@ const notifyRefreshReminder = async ({
  * Mark notification as read
  */
 const markAsRead = async (notificationId) => {
-  return Notification.findByIdAndUpdate(
-    notificationId,
-    { read: true },
-    { new: true },
-  );
+  return prisma.notification.update({
+    where: { id: notificationId },
+    data: { is_read: true },
+  });
 };
 
 /**
  * Mark all notifications as read for a user
  */
 const markAllAsRead = async (userId) => {
-  return Notification.updateMany(
-    { userId, read: false },
-    { read: true },
-  );
+  return prisma.notification.updateMany({
+    where: { user_id: userId, is_read: false },
+    data: { is_read: true },
+  });
 };
 
 /**
  * Get unread notifications count
  */
 const getUnreadCount = async (userId) => {
-  return Notification.countDocuments({ userId, read: false });
+  return prisma.notification.count({
+    where: { user_id: userId, is_read: false }
+  });
 };
 
 /**
@@ -199,7 +208,9 @@ const deleteOldNotifications = async () => {
   const ninetyDaysAgo = new Date();
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-  return Notification.deleteMany({ createdAt: { $lt: ninetyDaysAgo } });
+  return prisma.notification.deleteMany({
+    where: { created_at: { lt: ninetyDaysAgo } }
+  });
 };
 
 module.exports = {

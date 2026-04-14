@@ -24,14 +24,5 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
     return <Navigate to={dash} replace />;
   }
 
-  // Supplier/Broker: redirect to KYC waiting if not approved
-  if (
-    ['supplier', 'broker'].includes(user.role) &&
-    user.organizationStatus !== ORG_STATUS.APPROVED &&
-    !window.location.pathname.includes('/kyc-waiting')
-  ) {
-    return <Navigate to="/supplier/kyc-waiting" replace />;
-  }
-
   return children;
 }

@@ -1,8 +1,8 @@
 const express = require('express');
 const authenticate = require('../middleware/auth');
 const authorize = require('../middleware/roles');
-const Archive = require('../models/Archive');
-const { archiveListing, restoreListing, getArchiveHistory } = require('../services/archive.service');
+const prisma = require('../config/prisma');
+const { archiveListing, restoreListing } = require('../services/archive.service');
 const { logAction } = require('../services/audit.service');
 
 const router = express.Router();
@@ -16,14 +16,15 @@ router.post('/:model/:id', authorize('admin', 'superadmin', 'supplier', 'broker'
     const { model, id } = req.params;
     const { reason, reasonText } = req.body;
 
-    if (!['DcApplication', 'GpuClusterListing'].includes(model)) {
+    // In Prisma, we use 'Listing' for both DC and GPU
+    if (!['DcApplication', 'GpuClusterListing', 'Listing'].includes(model)) {
       return res.status(400).json({ error: 'Invalid model' });
     }
 
     const archive = await archiveListing({
-      targetModel: model,
+      targetModel: 'Listing',
       targetId: id,
-      organizationId: req.user.organizationId,
+      organizationId: req.user.organization_id,
       archivedBy: req.user.userId,
       reason: reason || 'MANUAL',
       reasonText,
@@ -33,13 +34,13 @@ router.post('/:model/:id', authorize('admin', 'superadmin', 'supplier', 'broker'
     await logAction({
       userId: req.user.userId,
       action: 'ARCHIVE_LISTING',
-      targetModel: `Archive`,
-      targetId: archive._id,
+      targetModel: 'Archive',
+      targetId: archive.id,
       changes: { model, listingId: id, reason },
       ipAddress: req.ip,
     });
 
-    res.json(archive);
+    res.json({ ...archive, _id: archive.id });
   } catch (err) { next(err); }
 });
 
@@ -49,12 +50,11 @@ router.put('/:model/:id/restore', authorize('admin', 'superadmin', 'supplier', '
   try {
     const { model, id } = req.params;
 
-    if (!['DcApplication', 'GpuClusterListing'].includes(model)) {
+    if (!['DcApplication', 'GpuClusterListing', 'Listing'].includes(model)) {
       return res.status(400).json({ error: 'Invalid model' });
     }
 
     const archive = await restoreListing({
-      targetModel: model,
       targetId: id,
       restoredBy: req.user.userId,
     });
@@ -64,12 +64,12 @@ router.put('/:model/:id/restore', authorize('admin', 'superadmin', 'supplier', '
       userId: req.user.userId,
       action: 'RESTORE_LISTING',
       targetModel: 'Archive',
-      targetId: archive._id,
+      targetId: archive.id,
       changes: { model, listingId: id },
       ipAddress: req.ip,
     });
 
-    res.json({ message: 'Listing restored', archive });
+    res.json({ message: 'Listing restored', archive: { ...archive, _id: archive.id } });
   } catch (err) { next(err); }
 });
 
@@ -77,18 +77,18 @@ router.put('/:model/:id/restore', authorize('admin', 'superadmin', 'supplier', '
 // Get archive history for a listing
 router.get('/:model/:id/history', async (req, res, next) => {
   try {
-    const { model, id } = req.params;
+    const { id } = req.params;
 
-    if (!['DcApplication', 'GpuClusterListing'].includes(model)) {
-      return res.status(400).json({ error: 'Invalid model' });
-    }
+    const history = await prisma.archive.findMany({
+      where: { target_id: id },
+      include: {
+        user_archived: { select: { email: true } },
+        user_restored: { select: { email: true } }
+      },
+      orderBy: { archived_at: 'desc' }
+    });
 
-    const history = await Archive.find({ targetModel: model, targetId: id })
-      .populate('archivedBy', 'email')
-      .populate('restoredBy', 'email')
-      .sort('-archivedAt');
-
-    res.json(history);
+    res.json(history.map(h => ({ ...h, _id: h.id, archivedBy: h.user_archived, restoredBy: h.user_restored })));
   } catch (err) { next(err); }
 });
 
@@ -97,20 +97,23 @@ router.get('/:model/:id/history', async (req, res, next) => {
 router.get('/', authorize('admin', 'superadmin'), async (req, res, next) => {
   try {
     const { model, organizationId, isActive } = req.query;
-    const filter = {};
+    const where = {};
 
-    if (model) filter.targetModel = model;
-    if (organizationId) filter.organizationId = organizationId;
-    if (isActive !== undefined) filter.isActive = isActive === 'true';
+    if (model) where.target_model = 'Listing';
+    if (organizationId) where.organization_id = organizationId;
+    if (isActive !== undefined) where.isActive = isActive === 'true';
 
-    const archives = await Archive.find(filter)
-      .populate('organizationId', 'companyName')
-      .populate('archivedBy', 'email')
-      .populate('restoredBy', 'email')
-      .sort('-archivedAt')
-      .limit(1000);
+    const archives = await prisma.archive.findMany({
+      where,
+      include: {
+        user_archived: { select: { email: true } },
+        user_restored: { select: { email: true } }
+      },
+      orderBy: { archived_at: 'desc' },
+      take: 1000
+    });
 
-    res.json(archives);
+    res.json(archives.map(h => ({ ...h, _id: h.id, archivedBy: h.user_archived, restoredBy: h.user_restored })));
   } catch (err) { next(err); }
 });
 

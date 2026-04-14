@@ -1,5 +1,5 @@
 const { verifyToken } = require('../services/jwt.service');
-const User = require('../models/User');
+const prisma = require('../config/prisma');
 
 const authenticate = async (req, res, next) => {
   const header = req.headers.authorization;
@@ -12,17 +12,20 @@ const authenticate = async (req, res, next) => {
 
   try {
     const payload = verifyToken(token);
-    const user = await User.findById(payload.userId).select('-__v');
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId }
+    });
 
     if (!user || !user.isActive) {
       return res.status(401).json({ error: 'Account deactivated or not found' });
     }
 
     req.user = {
-      userId: user._id,
+      userId: user.id,
       email: user.email,
       role: user.role,
-      organizationId: user.organizationId,
+      kyc_status: user.kyc_status,
+      organization_id: user.organization_id,
     };
 
     next();

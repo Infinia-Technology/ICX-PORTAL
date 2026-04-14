@@ -6,7 +6,7 @@ import Button from '../../components/ui/Button';
 import DataTable from '../../components/ui/DataTable';
 import Spinner from '../../components/ui/Spinner';
 
-const STATUS_VARIANT = { PENDING: 'default', KYC_SUBMITTED: 'info', APPROVED: 'success', REJECTED: 'error', REVISION_REQUESTED: 'warning' };
+const STATUS_VARIANT = { PENDING: 'default', SUBMITTED: 'info', APPROVED: 'success', REJECTED: 'error', REVISION_REQUESTED: 'warning' };
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState([]);

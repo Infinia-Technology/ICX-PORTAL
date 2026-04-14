@@ -1,27 +1,48 @@
-const DcApplication = require('../models/DcApplication');
-const DcSite = require('../models/DcSite');
-const DcPhasingSchedule = require('../models/DcPhasingSchedule');
-const DcDocument = require('../models/DcDocument');
+const prisma = require('../config/prisma');
 const { logAction } = require('../services/audit.service');
-const { createQueueItem, updateQueueStatus } = require('../services/queue.service');
-const { getPresignedPutUrl, getPresignedGetUrl } = require('../services/s3.service');
-const { paginate } = require('../utils/pagination');
-const Notification = require('../models/Notification');
-const { findDuplicateDcListings } = require('../services/duplicate.service');
+const { createQueueItem } = require('../services/queue.service');
+const { uploadFile, deleteFile } = require('../services/s3.service');
 
-const SUPPLIER_ROLES = ['supplier', 'broker', 'subordinate'];
+// Helper for Prisma pagination
+const paginatePrisma = async (model, where, page, limit, include = null, orderBy = { created_at: 'desc' }) => {
+  const pageNum = parseInt(page) || 1;
+  const limitNum = parseInt(limit) || 20;
+  const count = await model.count({ where });
+  const docs = await model.findMany({
+    where,
+    take: limitNum,
+    skip: (pageNum - 1) * limitNum,
+    orderBy,
+    include
+  });
+  return {
+    data: docs,
+    total: count,
+    limit: limitNum,
+    page: pageNum,
+    totalPages: Math.ceil(count / limitNum),
+    hasNext: pageNum < Math.ceil(count / limitNum),
+    hasPrev: pageNum > 1,
+  };
+};
 
 // GET /api/dc-applications
 const listApplications = async (req, res, next) => {
   try {
     const { page = 1, limit = 20, status, includeArchived = false } = req.query;
-    const filter = { organizationId: req.user.organizationId };
-    if (status) filter.status = status;
-    if (includeArchived !== 'true') filter.isArchived = false;
+    const where = { organization_id: req.user.organization_id, type: 'DC_SITE' };
+    if (status) where.status = status.toUpperCase();
+    if (includeArchived !== 'true') where.archived_at = null;
 
-    const result = await paginate(DcApplication, filter, {
-      page: parseInt(page), limit: parseInt(limit), sort: { createdAt: -1 },
-    });
+    const result = await paginatePrisma(prisma.listing, where, page, limit, { sites: true });
+    
+    result.data = result.data.map(item => ({
+      ...item,
+      _id: item.id,
+      createdAt: item.created_at,
+      sites: item.sites.map(s => ({ ...s, _id: s.id }))
+    }));
+
     res.json(result);
   } catch (err) { next(err); }
 };
@@ -29,240 +50,313 @@ const listApplications = async (req, res, next) => {
 // POST /api/dc-applications
 const createApplication = async (req, res, next) => {
   try {
-    const org = require('../models/Organization');
-    const orgDoc = await org.findById(req.user.organizationId);
-    if (orgDoc?.status !== 'APPROVED') {
-      return res.status(403).json({ error: 'Organization must be KYC approved before creating listings' });
-    }
-
-    const app = await DcApplication.create({
-      organizationId: req.user.organizationId,
-      brokerDcCompanyId: req.body.brokerDcCompanyId || undefined,
-      companyLegalEntity: req.body.companyLegalEntity,
-      companyOfficeAddress: req.body.companyOfficeAddress,
-      companyCountry: req.body.companyCountry,
-      contactName: req.body.contactName,
-      contactEmail: req.body.contactEmail,
-      contactMobile: req.body.contactMobile,
-      otherDetails: req.body.otherDetails,
+    const { dataCenterName, ...rest } = req.body;
+    const listing = await prisma.listing.create({
+      data: {
+        type: 'DC_SITE',
+        data_center_name: dataCenterName || 'New DC Application',
+        supplier_id: req.user.userId,
+        organization_id: req.user.organization_id,
+        status: 'DRAFT',
+        specifications: rest,
+      }
     });
 
-    await logAction({ userId: req.user.userId, action: 'CREATE_DC_APPLICATION', targetModel: 'DcApplication', targetId: app._id, ipAddress: req.ip });
-    res.status(201).json(app);
+    await logAction({ userId: req.user.userId, action: 'CREATE_DC_APPLICATION', targetModel: 'Listing', targetId: listing.id, ipAddress: req.ip });
+    res.status(201).json({ ...listing, _id: listing.id });
   } catch (err) { next(err); }
 };
 
 // GET /api/dc-applications/:id
 const getApplication = async (req, res, next) => {
   try {
-    const app = await DcApplication.findOne({ _id: req.params.id, organizationId: req.user.organizationId });
+    const app = await prisma.listing.findFirst({
+      where: { id: req.params.id, organization_id: req.user.organization_id },
+      include: { sites: { include: { documents: true } } }
+    });
     if (!app) return res.status(404).json({ error: 'Application not found' });
 
-    const sites = await DcSite.find({ dcApplicationId: app._id });
-    res.json({ ...app.toObject(), sites });
+    const formatted = {
+      ...app,
+      _id: app.id,
+      ...(typeof app.specifications === 'object' ? app.specifications : {}),
+      sites: app.sites.map(s => ({
+        ...s,
+        _id: s.id,
+        ...(typeof s.specifications === 'object' ? s.specifications : {}),
+        documents: s.documents.map(d => ({ ...d, _id: d.id }))
+      }))
+    };
+
+    res.json(formatted);
   } catch (err) { next(err); }
 };
 
 // PUT /api/dc-applications/:id
 const updateApplication = async (req, res, next) => {
   try {
-    const app = await DcApplication.findOne({ _id: req.params.id, organizationId: req.user.organizationId });
+    const app = await prisma.listing.findFirst({
+      where: { id: req.params.id, organization_id: req.user.organization_id }
+    });
     if (!app) return res.status(404).json({ error: 'Application not found' });
 
     if (!['DRAFT', 'REVISION_REQUESTED'].includes(app.status)) {
       return res.status(400).json({ error: 'Application cannot be edited in current status' });
     }
 
-    const allowed = ['companyLegalEntity', 'companyOfficeAddress', 'companyCountry', 'contactName', 'contactEmail', 'contactMobile', 'otherDetails', 'brokerDcCompanyId'];
-    allowed.forEach((f) => { if (req.body[f] !== undefined) app[f] = req.body[f]; });
-    app.lastActivityAt = new Date();
-    await app.save();
-    await logAction({ userId: req.user.userId, action: 'UPDATE_DC_APPLICATION', targetModel: 'DcApplication', targetId: app._id, ipAddress: req.ip });
-    res.json(app);
+    const { dataCenterName, ...rest } = req.body;
+    const updated = await prisma.listing.update({
+      where: { id: app.id },
+      data: { 
+        data_center_name: dataCenterName || app.data_center_name,
+        specifications: rest,
+        updated_at: new Date()
+      }
+    });
+
+    await logAction({ userId: req.user.userId, action: 'UPDATE_DC_APPLICATION', targetModel: 'Listing', targetId: updated.id, ipAddress: req.ip });
+    res.json({ ...updated, _id: updated.id });
   } catch (err) { next(err); }
 };
 
 // POST /api/dc-applications/:id/submit
 const submitApplication = async (req, res, next) => {
   try {
-    const { force = false } = req.body;
-    const app = await DcApplication.findOne({ _id: req.params.id, organizationId: req.user.organizationId });
+    const app = await prisma.listing.findFirst({
+      where: { id: req.params.id, organization_id: req.user.organization_id }
+    });
     if (!app) return res.status(404).json({ error: 'Application not found' });
 
-    if (!['DRAFT'].includes(app.status)) {
-      return res.status(400).json({ error: 'Only draft applications can be submitted' });
+    if (!['DRAFT', 'REVISION_REQUESTED'].includes(app.status)) {
+      return res.status(400).json({ error: 'Only draft or revision-requested applications can be submitted' });
     }
 
-    // Check for duplicates (skip if force=true)
-    if (!force) {
-      const duplicates = await findDuplicateDcListings({
-        organizationId: app.organizationId,
-        location: app.location,
-        googleMapsLink: app.googleMapsLink,
-        companyLegalEntity: app.companyLegalEntity,
-      });
-
-      // If duplicates found, return warning without blocking submission
-      if (duplicates.length > 0) {
-        return res.status(200).json({
-          hasDuplicates: true,
-          duplicates,
-          message: `Found ${duplicates.length} potential duplicate(s). Review before confirming.`,
-        });
+    const updated = await prisma.listing.update({
+      where: { id: app.id },
+      data: { 
+        status: 'SUBMITTED',
+        updated_at: new Date()
       }
-    }
+    });
 
-    app.status = 'SUBMITTED';
-    app.submittedAt = new Date();
-    await app.save();
-
-    await createQueueItem({ type: 'DC_LISTING', referenceId: app._id, referenceModel: 'DcApplication' });
-    await logAction({ userId: req.user.userId, action: 'SUBMIT_DC_APPLICATION', targetModel: 'DcApplication', targetId: app._id, ipAddress: req.ip });
-    res.json({ message: 'Application submitted for review', status: app.status, hasDuplicates: false });
+    await logAction({ userId: req.user.userId, action: 'SUBMIT_DC_APPLICATION', targetModel: 'Listing', targetId: updated.id, ipAddress: req.ip });
+    
+    await createQueueItem({
+      type: 'DC_LISTING',
+      referenceId: updated.id,
+      referenceModel: 'Listing'
+    });
+    
+    res.json({ message: 'Application submitted for review', status: updated.status, _id: updated.id });
   } catch (err) { next(err); }
 };
 
 // POST /api/dc-applications/:id/resubmit
 const resubmitApplication = async (req, res, next) => {
   try {
-    const app = await DcApplication.findOne({ _id: req.params.id, organizationId: req.user.organizationId });
+    const app = await prisma.listing.findFirst({
+      where: { id: req.params.id, organization_id: req.user.organization_id }
+    });
     if (!app) return res.status(404).json({ error: 'Application not found' });
 
     if (app.status !== 'REVISION_REQUESTED') {
       return res.status(400).json({ error: 'Only applications with revision requested can be resubmitted' });
     }
 
-    app.status = 'RESUBMITTED';
-    app.submittedAt = new Date();
-    await app.save();
+    const updated = await prisma.listing.update({
+      where: { id: app.id },
+      data: { status: 'RESUBMITTED', updated_at: new Date() }
+    });
 
-    await updateQueueStatus(app._id, 'DcApplication', 'RESUBMITTED');
-    await logAction({ userId: req.user.userId, action: 'RESUBMIT_DC_APPLICATION', targetModel: 'DcApplication', targetId: app._id, ipAddress: req.ip });
-    res.json({ message: 'Application resubmitted', status: app.status });
+    await logAction({ userId: req.user.userId, action: 'RESUBMIT_DC_APPLICATION', targetModel: 'Listing', targetId: updated.id, ipAddress: req.ip });
+    res.json({ message: 'Application resubmitted', status: updated.status });
   } catch (err) { next(err); }
 };
 
 // POST /api/dc-applications/:id/sites
 const addSite = async (req, res, next) => {
   try {
-    const app = await DcApplication.findOne({ _id: req.params.id, organizationId: req.user.organizationId });
+    const app = await prisma.listing.findFirst({
+      where: { id: req.params.id, organization_id: req.user.organization_id }
+    });
     if (!app) return res.status(404).json({ error: 'Application not found' });
 
-    const body = {};
-    for (const [key, val] of Object.entries(req.body)) {
-      if (val !== '') body[key] = val;
-    }
-    const site = await DcSite.create({ dcApplicationId: app._id, ...body });
-    await logAction({ userId: req.user.userId, action: 'ADD_DC_SITE', targetModel: 'DcSite', targetId: site._id, ipAddress: req.ip });
-    res.status(201).json(site);
+    const { siteName, ...specs } = req.body;
+    const site = await prisma.dcSite.create({
+      data: {
+        listing_id: app.id,
+        site_name: siteName || 'New Site',
+        specifications: specs
+      }
+    });
+
+    await logAction({ userId: req.user.userId, action: 'ADD_DC_SITE', targetModel: 'DcSite', targetId: site.id, ipAddress: req.ip });
+    res.status(201).json({ ...site, _id: site.id });
   } catch (err) { next(err); }
 };
 
 // GET /api/dc-applications/:id/sites/:siteId
 const getSite = async (req, res, next) => {
   try {
-    const app = await DcApplication.findOne({ _id: req.params.id, organizationId: req.user.organizationId });
-    if (!app) return res.status(404).json({ error: 'Application not found' });
-
-    const site = await DcSite.findOne({ _id: req.params.siteId, dcApplicationId: app._id });
+    const site = await prisma.dcSite.findFirst({
+      where: { id: req.params.siteId, listing_id: req.params.id },
+      include: { documents: true, phasing: true }
+    });
     if (!site) return res.status(404).json({ error: 'Site not found' });
 
-    const phasing = await DcPhasingSchedule.find({ dcSiteId: site._id }).sort({ month: 1 });
-    const documents = await DcDocument.find({ dcSiteId: site._id });
-
-    res.json({ ...site.toObject(), phasing, documents });
+    res.json({
+      ...site,
+      _id: site.id,
+      ...(typeof site.specifications === 'object' ? site.specifications : {}),
+      phasing: site.phasing.map(p => ({ ...p, _id: p.id })),
+      documents: site.documents.map(d => ({ ...d, _id: d.id }))
+    });
   } catch (err) { next(err); }
 };
 
 // PUT /api/dc-applications/:id/sites/:siteId
 const updateSite = async (req, res, next) => {
   try {
-    const app = await DcApplication.findOne({ _id: req.params.id, organizationId: req.user.organizationId });
-    if (!app) return res.status(404).json({ error: 'Application not found' });
-
-    const site = await DcSite.findOne({ _id: req.params.siteId, dcApplicationId: app._id });
+    const site = await prisma.dcSite.findFirst({
+      where: { id: req.params.siteId, listing_id: req.params.id }
+    });
     if (!site) return res.status(404).json({ error: 'Site not found' });
 
-    const body = { ...req.body };
-    for (const key of Object.keys(body)) {
-      if (body[key] === '') body[key] = undefined;
-    }
-    delete body.history; // never overwrite history from client
-    Object.assign(site, body);
-    await site.save();
-    res.json(site);
+    const { siteName, ...specs } = req.body;
+    const updated = await prisma.dcSite.update({
+      where: { id: site.id },
+      data: {
+        site_name: siteName || site.site_name,
+        specifications: specs
+      }
+    });
+
+    res.json({ ...updated, _id: updated.id });
   } catch (err) { next(err); }
 };
 
 // DELETE /api/dc-applications/:id/sites/:siteId
 const deleteSite = async (req, res, next) => {
   try {
-    const app = await DcApplication.findOne({ _id: req.params.id, organizationId: req.user.organizationId });
-    if (!app) return res.status(404).json({ error: 'Application not found' });
+    const site = await prisma.dcSite.findFirst({
+      where: { id: req.params.siteId, listing_id: req.params.id }
+    });
+    if (!site) return res.status(404).json({ error: 'Site not found' });
 
-    await DcSite.deleteOne({ _id: req.params.siteId, dcApplicationId: app._id });
-    await DcPhasingSchedule.deleteMany({ dcSiteId: req.params.siteId });
-    await DcDocument.deleteMany({ dcSiteId: req.params.siteId });
-
-    await logAction({ userId: req.user.userId, action: 'DELETE_DC_SITE', changes: { siteId: req.params.siteId }, ipAddress: req.ip });
+    await prisma.dcSite.delete({ where: { id: site.id } });
+    await logAction({ userId: req.user.userId, action: 'DELETE_DC_SITE', targetModel: 'DcSite', targetId: site.id, ipAddress: req.ip });
     res.json({ message: 'Site deleted' });
   } catch (err) { next(err); }
 };
 
-// GET /api/dc-sites/:siteId/phasing
+// GET /api/sites/:siteId/phasing
 const getPhasing = async (req, res, next) => {
   try {
-    const rows = await DcPhasingSchedule.find({ dcSiteId: req.params.siteId }).sort({ month: 1 });
-    res.json(rows);
+    const rows = await prisma.dcPhasingSchedule.findMany({
+      where: { site_id: req.params.siteId },
+      orderBy: { month: 'asc' }
+    });
+    res.json(rows.map(r => ({ ...r, _id: r.id })));
   } catch (err) { next(err); }
 };
 
-// PUT /api/dc-sites/:siteId/phasing  (bulk upsert)
+// PUT /api/sites/:siteId/phasing
 const updatePhasing = async (req, res, next) => {
   try {
-    const { rows } = req.body; // array of phasing rows
+    const { rows } = req.body;
     if (!Array.isArray(rows)) return res.status(400).json({ error: 'rows must be an array' });
 
-    // Delete existing and replace
-    await DcPhasingSchedule.deleteMany({ dcSiteId: req.params.siteId });
+    await prisma.dcPhasingSchedule.deleteMany({ where: { site_id: req.params.siteId } });
 
     if (rows.length > 0) {
-      const toInsert = rows.map((r) => ({ ...r, dcSiteId: req.params.siteId }));
-      await DcPhasingSchedule.insertMany(toInsert);
+      await prisma.dcPhasingSchedule.createMany({
+        data: rows.map(r => ({
+          site_id: req.params.siteId,
+          month: new Date(r.month),
+          it_load_mw: r.itLoadMw || 0,
+          cumulative_it_load_mw: r.cumulativeItLoadMw || 0,
+          scope_of_works: r.scopeOfWorks || '',
+          phase: r.phase || 1,
+          estimated_capex_musd: r.estimatedCapexMusd || 0,
+          min_lease_duration_yrs: r.minLeaseDurationYrs || 0,
+          nrc_request_musd: r.nrcRequestMusd || 0,
+          initial_deposit_musd: r.initialDepositMusd || 0,
+          mrc_request_per_kw: r.mrcRequestPerKw || 0,
+          mrc_inclusions: r.mrcInclusions || ''
+        }))
+      });
     }
 
-    const updated = await DcPhasingSchedule.find({ dcSiteId: req.params.siteId }).sort({ month: 1 });
-    res.json(updated);
+    const updated = await prisma.dcPhasingSchedule.findMany({
+      where: { site_id: req.params.siteId },
+      orderBy: { month: 'asc' }
+    });
+    res.json(updated.map(r => ({ ...r, _id: r.id })));
   } catch (err) { next(err); }
 };
 
-// POST /api/dc-sites/:siteId/documents
+// POST /api/dc-applications/:id/refresh
+const refreshApplication = async (req, res, next) => {
+  try {
+    const updated = await prisma.listing.update({
+      where: { id: req.params.id, organization_id: req.user.organization_id },
+      data: { updated_at: new Date() }
+    });
+    res.json({ message: 'Application refreshed', lastActivityAt: updated.updated_at });
+  } catch (err) { next(err); }
+};
+
+// Documents
 const uploadDocument = async (req, res, next) => {
   try {
+    const { id, siteId } = req.params;
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-    const { documentType } = req.body;
-    if (!documentType) return res.status(400).json({ error: 'documentType is required' });
+    // Ensure the listing and site exist and belong to the org
+    const site = await prisma.dcSite.findFirst({
+      where: { id: siteId, listing_id: id, listing: { organization_id: req.user.organization_id } }
+    });
+    if (!site) return res.status(404).json({ error: 'Site not found or access denied' });
 
-    const doc = await DcDocument.create({
-      dcSiteId: req.params.siteId,
-      documentType,
-      fileName: req.file.originalname,
-      fileUrl: req.file.location || req.file.path,
-      fileSize: req.file.size,
-      mimeType: req.file.mimetype,
-      uploadedBy: req.user.userId,
+    const documentType = req.body.documentType || 'Other';
+
+    const { key, fileName } = await uploadFile(req.user.organization_id, 'dcsite', siteId, req.file);
+
+    const document = await prisma.dcDocument.create({
+      data: {
+        site_id: siteId,
+        document_type: documentType,
+        file_name: fileName,
+        file_url: key,
+        file_size: req.file.size,
+        mime_type: req.file.mimetype,
+        uploaded_by: req.user.userId
+      }
     });
 
-    res.status(201).json(doc);
+    res.status(201).json({ ...document, _id: document.id });
   } catch (err) { next(err); }
 };
 
-// DELETE /api/dc-sites/:siteId/documents/:docId
 const deleteDocument = async (req, res, next) => {
   try {
-    await DcDocument.deleteOne({ _id: req.params.docId, dcSiteId: req.params.siteId });
-    res.json({ message: 'Document deleted' });
+    const { id, siteId, docId } = req.params;
+
+    const document = await prisma.dcDocument.findFirst({
+      where: { 
+        id: docId, 
+        site_id: siteId, 
+        site: { listing_id: id, listing: { organization_id: req.user.organization_id } } 
+      }
+    });
+
+    if (!document) return res.status(404).json({ error: 'Document not found or access denied' });
+
+    await deleteFile(document.file_url);
+
+    await prisma.dcDocument.delete({ where: { id: docId } });
+
+    res.json({ message: 'Document deleted successfully' });
   } catch (err) { next(err); }
 };
 
@@ -272,4 +366,7 @@ module.exports = {
   addSite, getSite, updateSite, deleteSite,
   getPhasing, updatePhasing,
   uploadDocument, deleteDocument,
+  refreshApplication,
+  // Alias for backward compatibility
+  getListingDetails: getApplication 
 };

@@ -2,10 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authenticate = require('../middleware/auth');
 const authorize = require('../middleware/roles');
-const DcApplication = require('../models/DcApplication');
-const DcSite = require('../models/DcSite');
-const GpuClusterListing = require('../models/GpuClusterListing');
-const Organization = require('../models/Organization');
+const prisma = require('../config/prisma');
 const { logAction } = require('../services/audit.service');
 const reportController = require('../controllers/report.controller');
 
@@ -38,7 +35,7 @@ const flattenObj = (obj, prefix = '') =>
   Object.keys(obj).reduce((acc, key) => {
     const val = obj[key];
     const newKey = prefix ? `${prefix}_${key}` : key;
-    if (val && typeof val === 'object' && !Array.isArray(val) && !(val instanceof Date) && !(val instanceof Object.getPrototypeOf(val).constructor)) {
+    if (val && typeof val === 'object' && !Array.isArray(val) && !(val instanceof Date)) {
       Object.assign(acc, flattenObj(val, newKey));
     } else {
       acc[newKey] = Array.isArray(val) ? val.join('; ') : val;
@@ -56,13 +53,14 @@ const toCsv = (data) => {
 // GET /api/reports/dc-listing/:id/pdf
 router.get('/dc-listing/:id/pdf', authorize('supplier', 'broker', 'admin'), async (req, res, next) => {
   try {
-    const app = await DcApplication.findById(req.params.id).lean();
-    if (!app) return res.status(404).json({ error: 'DC listing not found' });
-
-    const sites = await DcSite.find({ dcApplicationId: app._id }).lean();
+    const listing = await prisma.listing.findUnique({
+      where: { id: req.params.id },
+      include: { sites: true }
+    });
+    if (!listing) return res.status(404).json({ error: 'DC listing not found' });
 
     // Simple HTML-based PDF response (client can print to PDF)
-    const html = `<html><body><h1>DC Listing Report</h1><pre>${JSON.stringify({ ...app, sites }, null, 2)}</pre></body></html>`;
+    const html = `<html><body><h1>DC Listing Report</h1><pre>${JSON.stringify(listing, null, 2)}</pre></body></html>`;
     res.setHeader('Content-Type', 'text/html');
     res.setHeader('Content-Disposition', `attachment; filename="dc-listing-${req.params.id}.html"`);
     res.send(html);
@@ -72,12 +70,14 @@ router.get('/dc-listing/:id/pdf', authorize('supplier', 'broker', 'admin'), asyn
 // GET /api/reports/dc-listing/:id/csv
 router.get('/dc-listing/:id/csv', authorize('supplier', 'broker', 'admin'), async (req, res, next) => {
   try {
-    const app = await DcApplication.findById(req.params.id).lean();
-    if (!app) return res.status(404).json({ error: 'DC listing not found' });
+    const listing = await prisma.listing.findUnique({
+      where: { id: req.params.id },
+      include: { sites: true }
+    });
+    if (!listing) return res.status(404).json({ error: 'DC listing not found' });
 
-    const sites = await DcSite.find({ dcApplicationId: app._id }).lean();
-    const rows = sites.map((s) => flattenObj({ ...app, ...s }));
-    const csv = toCsv(rows.length ? rows : [flattenObj(app)]);
+    const rows = listing.sites.map((s) => flattenObj({ ...listing, ...s }));
+    const csv = toCsv(rows.length ? rows : [flattenObj(listing)]);
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="dc-listing-${req.params.id}.csv"`);
@@ -88,7 +88,9 @@ router.get('/dc-listing/:id/csv', authorize('supplier', 'broker', 'admin'), asyn
 // GET /api/reports/gpu-cluster/:id/pdf
 router.get('/gpu-cluster/:id/pdf', authorize('supplier', 'broker', 'admin'), async (req, res, next) => {
   try {
-    const cluster = await GpuClusterListing.findById(req.params.id).lean();
+    const cluster = await prisma.listing.findUnique({
+      where: { id: req.params.id }
+    });
     if (!cluster) return res.status(404).json({ error: 'GPU cluster not found' });
 
     const html = `<html><body><h1>GPU Cluster Report</h1><pre>${JSON.stringify(cluster, null, 2)}</pre></body></html>`;
@@ -101,7 +103,9 @@ router.get('/gpu-cluster/:id/pdf', authorize('supplier', 'broker', 'admin'), asy
 // GET /api/reports/gpu-cluster/:id/csv
 router.get('/gpu-cluster/:id/csv', authorize('supplier', 'broker', 'admin'), async (req, res, next) => {
   try {
-    const cluster = await GpuClusterListing.findById(req.params.id).lean();
+    const cluster = await prisma.listing.findUnique({
+      where: { id: req.params.id }
+    });
     if (!cluster) return res.status(404).json({ error: 'GPU cluster not found' });
 
     const csv = toCsv([flattenObj(cluster)]);
@@ -114,11 +118,16 @@ router.get('/gpu-cluster/:id/csv', authorize('supplier', 'broker', 'admin'), asy
 // GET /api/reports/supplier/:id/pdf
 router.get('/supplier/:id/pdf', authorize('admin'), async (req, res, next) => {
   try {
-    const org = await Organization.findById(req.params.id).lean();
+    const org = await prisma.organization.findUnique({
+      where: { id: req.params.id },
+      include: {
+        listings: true
+      }
+    });
     if (!org) return res.status(404).json({ error: 'Supplier not found' });
 
-    const dcApps = await DcApplication.find({ organizationId: org._id }).lean();
-    const gpuClusters = await GpuClusterListing.find({ organizationId: org._id }).lean();
+    const dcApps = org.listings.filter(l => l.type === 'DC_SITE');
+    const gpuClusters = org.listings.filter(l => l.type === 'GPU_CLUSTER');
 
     const html = `<html><body><h1>Supplier Report</h1><pre>${JSON.stringify({ org, dcApps, gpuClusters }, null, 2)}</pre></body></html>`;
     res.setHeader('Content-Type', 'text/html');
@@ -131,10 +140,10 @@ router.get('/supplier/:id/pdf', authorize('admin'), async (req, res, next) => {
 router.get('/analytics/csv', authorize('admin'), async (req, res, next) => {
   try {
     const [totalSuppliers, totalCustomers, totalDcListings, totalGpuClusters] = await Promise.all([
-      Organization.countDocuments({ type: { $in: ['SUPPLIER', 'BROKER'] }, status: 'APPROVED' }),
-      Organization.countDocuments({ type: 'CUSTOMER', status: 'APPROVED' }),
-      DcApplication.countDocuments({ status: 'APPROVED' }),
-      GpuClusterListing.countDocuments({ status: 'APPROVED' }),
+      prisma.organization.count({ where: { type: { in: ['SUPPLIER', 'BROKER'] }, status: 'APPROVED' } }),
+      prisma.organization.count({ where: { type: 'CUSTOMER', status: 'APPROVED' } }),
+      prisma.listing.count({ where: { type: 'DC_SITE', status: 'APPROVED' } }),
+      prisma.listing.count({ where: { type: 'GPU_CLUSTER', status: 'APPROVED' } }),
     ]);
 
     const csv = toCsv([{ totalSuppliers, totalCustomers, totalDcListings, totalGpuClusters, exportedAt: new Date() }]);

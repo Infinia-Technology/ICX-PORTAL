@@ -1,16 +1,19 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Building2, Server, FileText, Users, ShieldCheck,
-  BarChart3, Settings, ClipboardList, Eye, Zap, Database, PackageOpen,
+  BarChart3, Settings, ClipboardList, Eye, Zap, Database, PackageOpen, FileSpreadsheet,
 } from 'lucide-react';
 import { ROLES } from '../../config/constants';
 
 const navConfig = {
   [ROLES.SUPPLIER]: [
     { label: 'Dashboard', to: '/supplier/dashboard', icon: LayoutDashboard },
+    { section: 'Questionnaires' },
     { label: 'DC Listings', to: '/supplier/dc-listings', icon: Building2 },
     { label: 'GPU Listings', to: '/supplier/gpu-clusters', icon: Server },
+    { section: 'Database' },
     { label: 'Inventory', to: '/supplier/inventory', icon: PackageOpen },
+    { section: null },
     { label: 'Team', to: '/supplier/team', icon: Users },
     { label: 'Settings', to: '/supplier/settings', icon: Settings },
   ],
@@ -25,45 +28,51 @@ const navConfig = {
   [ROLES.CUSTOMER]: [
     { label: 'Dashboard', to: '/customer/dashboard', icon: LayoutDashboard },
     { label: 'Marketplace', to: '/customer/marketplace', icon: Eye, comingSoon: true },
+    { section: 'Database' },
     { label: 'GPU Demands', to: '/customer/gpu-demands', icon: Zap },
     { label: 'DC Requests', to: '/customer/dc-requests', icon: Database },
+    { section: null },
     { label: 'Settings', to: '/customer/settings', icon: Settings },
   ],
   [ROLES.ADMIN]: [
-    { label: 'Dashboard', to: '/admin/dashboard', icon: LayoutDashboard },
-    { label: 'Queue', to: '/admin/queue', icon: ClipboardList },
+    { label: 'Admin Workspace', to: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'Suppliers', to: '/admin/suppliers', icon: Building2 },
     { label: 'Customers', to: '/admin/customers', icon: Users },
+    { section: 'Questionnaires' },
     { label: 'DC Listings', to: '/admin/dc-listings', icon: Building2 },
     { label: 'GPU Listings', to: '/admin/gpu-clusters', icon: Server },
+    { section: 'Database' },
     { label: 'Inventory', to: '/admin/inventory', icon: PackageOpen },
     { label: 'GPU Demands', to: '/admin/gpu-demands', icon: Zap },
     { label: 'DC Requests', to: '/admin/dc-requests', icon: Database },
+    { section: null },
     { label: 'Readers', to: '/admin/readers', icon: Eye },
-    { label: 'Analytics', to: '/admin/dashboard', icon: BarChart3 },
+    { label: 'Reports', to: '/admin/reports', icon: FileSpreadsheet },
     { label: 'Settings', to: '/admin/settings', icon: Settings },
   ],
   [ROLES.SUPERADMIN]: [
-    { label: 'Dashboard', to: '/admin/dashboard', icon: LayoutDashboard },
-    { label: 'Queue', to: '/admin/queue', icon: ClipboardList },
+    { label: 'Admin Workspace', to: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'Users', to: '/admin/users', icon: Users },
     { label: 'Audit Log', to: '/admin/audit-log', icon: ShieldCheck },
     { label: 'Suppliers', to: '/admin/suppliers', icon: Building2 },
     { label: 'Customers', to: '/admin/customers', icon: Users },
+    { section: 'Questionnaires' },
     { label: 'DC Listings', to: '/admin/dc-listings', icon: Building2 },
     { label: 'GPU Listings', to: '/admin/gpu-clusters', icon: Server },
+    { section: 'Database' },
     { label: 'Inventory', to: '/admin/inventory', icon: PackageOpen },
     { label: 'GPU Demands', to: '/admin/gpu-demands', icon: Zap },
     { label: 'DC Requests', to: '/admin/dc-requests', icon: Database },
+    { section: null },
     { label: 'Readers', to: '/admin/readers', icon: Eye },
+    { label: 'Reports', to: '/admin/reports', icon: FileSpreadsheet },
     { label: 'Settings', to: '/admin/settings', icon: Settings },
   ],
   [ROLES.READER]: [
     { label: 'Marketplace', to: '/reader/marketplace', icon: Eye },
   ],
   [ROLES.VIEWER]: [
-    { label: 'Dashboard', to: '/admin/dashboard', icon: LayoutDashboard },
-    { label: 'Queue', to: '/admin/queue', icon: ClipboardList },
+    { label: 'Admin Workspace', to: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'Marketplace', to: '/customer/marketplace', icon: Eye },
   ],
 };
@@ -74,7 +83,19 @@ export default function Sidebar({ role }) {
   return (
     <aside className="w-[var(--sidebar-width)] bg-[var(--color-surface)] border-r border-[var(--color-border)] h-[calc(100vh-var(--topbar-height))] overflow-y-auto fixed top-[var(--topbar-height)] left-0">
       <nav className="p-4 flex flex-col gap-1">
-        {items.map((item) => {
+        {items.map((item, index) => {
+          if (item.section !== undefined) {
+            if (item.section) {
+              return (
+                <div key={`section-${index}`} className="pt-3 pb-1 px-3 text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
+                  {item.section}
+                </div>
+              );
+            } else {
+              return <div key={`section-${index}`} className="py-1" />;
+            }
+          }
+
           const Icon = item.icon;
           if (item.comingSoon) {
             return (

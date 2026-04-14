@@ -8,7 +8,7 @@ import TextArea from '../../components/ui/TextArea';
 import Spinner from '../../components/ui/Spinner';
 import { useToast } from '../../components/ui/Toast';
 
-const STATUS_VARIANT = { PENDING: 'default', KYC_SUBMITTED: 'info', APPROVED: 'success', REJECTED: 'error', REVISION_REQUESTED: 'warning' };
+const STATUS_VARIANT = { PENDING: 'default', SUBMITTED: 'info', APPROVED: 'success', REJECTED: 'error', REVISION_REQUESTED: 'warning' };
 const Field = ({ label, value }) => (<div><dt className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">{label}</dt><dd className="text-sm">{value || '—'}</dd></div>);
 
 export default function SupplierDetailPage() {
@@ -40,7 +40,7 @@ export default function SupplierDetailPage() {
   if (loading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
   if (!data) return <div className="text-center py-20">Not found</div>;
 
-  const canReview = ['KYC_SUBMITTED', 'RESUBMITTED'].includes(data.status) || data.status === 'REVISION_REQUESTED';
+  const canReview = ['SUBMITTED', 'RESUBMITTED'].includes(data.status) || data.status === 'REVISION_REQUESTED';
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">

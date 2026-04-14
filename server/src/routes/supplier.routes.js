@@ -7,6 +7,7 @@ const {
   getTeam, inviteTeamMember, revokeTeamMember,
   getBrokerCompanies, addBrokerCompany, updateBrokerCompany,
 } = require('../controllers/supplier.controller');
+const { getSuppliers } = require('../controllers/admin.controller');
 
 router.use(authenticate);
 

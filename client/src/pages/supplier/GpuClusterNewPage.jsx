@@ -14,7 +14,7 @@ import AutoSaveIndicator from '../../components/ui/AutoSaveIndicator';
 import DuplicateWarningModal from '../../components/ui/DuplicateWarningModal';
 import InfoIcon from '../../components/ui/InfoIcon';
 
-const STEPS = ['Basic Info', 'Compute Node', 'Compute Network', 'Management Network', 'OOB & Storage', 'Cluster Description', 'Power & Facility', 'Review & Submit'];
+const STEPS = ['Basic Info', 'Compute Node', 'Compute Network', 'Management Network', 'Other', 'Cluster Description', 'Extended Information', 'Power & Facility', 'Review & Submit'];
 
 export default function GpuClusterNewPage() {
   const navigate = useNavigate();
@@ -32,7 +32,8 @@ export default function GpuClusterNewPage() {
   const [s4, setS4] = useState({ mgmtNetTopology: '', mgmtNetTechnology: '', mgmtNetLayers: '', mgmtNetSwitchVendor: '', mgmtNetOversubscription: '', mgmtNetScalability: '' });
   const [s5, setS5] = useState({ oobNetTechnology: '', storageOptions: '', connectivityDetails: '' });
   const [s6, setS6] = useState({ clusterDescription: '' });
-  const [s7, setS7] = useState({ powerSupplyStatus: '', rackPowerCapacityKw: '', modularDataHalls: '', totalPowerCapacityMw: '', coolingDesign: '', backupGenerators: '' });
+  const [s7, setS7] = useState({ redundancy: '', failover: '', clusterName: '', clusterIdentifier: '' });
+  const [s8, setS8] = useState({ powerSupplyStatus: '', rackPowerCapacityKw: '', modularDataHalls: '', totalPowerCapacityMw: '', coolingDesign: '', backupGenerators: '' });
 
   // Reload draft data on mount if id exists in URL
   useEffect(() => {
@@ -47,7 +48,8 @@ export default function GpuClusterNewPage() {
         setS4({ mgmtNetTopology: c.mgmtNetTopology || '', mgmtNetTechnology: c.mgmtNetTechnology || '', mgmtNetLayers: c.mgmtNetLayers ?? '', mgmtNetSwitchVendor: c.mgmtNetSwitchVendor || '', mgmtNetOversubscription: c.mgmtNetOversubscription || '', mgmtNetScalability: c.mgmtNetScalability || '' });
         setS5({ oobNetTechnology: c.oobNetTechnology || '', storageOptions: c.storageOptions || '', connectivityDetails: c.connectivityDetails || '' });
         setS6({ clusterDescription: c.clusterDescription || '' });
-        setS7({ powerSupplyStatus: c.powerSupplyStatus || '', rackPowerCapacityKw: c.rackPowerCapacityKw ?? '', modularDataHalls: c.modularDataHalls ?? '', totalPowerCapacityMw: c.totalPowerCapacityMw ?? '', coolingDesign: c.coolingDesign || '', backupGenerators: c.backupGenerators || '' });
+        setS7({ redundancy: c.redundancy || '', failover: c.failover || '', clusterName: c.clusterName || '', clusterIdentifier: c.clusterIdentifier || '' });
+        setS8({ powerSupplyStatus: c.powerSupplyStatus || '', rackPowerCapacityKw: c.rackPowerCapacityKw ?? '', modularDataHalls: c.modularDataHalls ?? '', totalPowerCapacityMw: c.totalPowerCapacityMw ?? '', coolingDesign: c.coolingDesign || '', backupGenerators: c.backupGenerators || '' });
       })
       .catch(() => addToast({ type: 'error', message: 'Failed to load draft' }))
       .finally(() => setLoadingDraft(false));
@@ -61,12 +63,12 @@ export default function GpuClusterNewPage() {
   };
 
   // Auto-save current step's data only
-  const gpuStepMap = { 0: s1, 1: s2, 2: s3, 3: s4, 4: s5, 5: s6, 6: s7 };
+  const gpuStepMap = { 0: s1, 1: s2, 2: s3, 3: s4, 4: s5, 5: s6, 6: s7, 7: s8 };
   const currentStepData = gpuStepMap[step] || null;
   const { status: autoSaveStatus } = useAutoSave(
     clusterId ? `/gpu-clusters/${clusterId}` : null,
     currentStepData,
-    { enabled: !!clusterId && step < 7 }
+    { enabled: !!clusterId && step < 8 }
   );
 
   const f = (setter) => (e) => setter((p) => ({ ...p, [e.target.name]: e.target.value }));
@@ -101,6 +103,7 @@ export default function GpuClusterNewPage() {
     else if (step === 4) data = { ...s5 };
     else if (step === 5) data = { ...s6 };
     else if (step === 6) data = { ...s7 };
+    else if (step === 7) data = { ...s8 };
 
     const ok = await saveCluster(data);
     if (ok) {
@@ -122,7 +125,7 @@ export default function GpuClusterNewPage() {
         return;
       }
 
-      addToast({ type: 'success', message: 'GPU listing submitted for review!' });
+      addToast({ type: 'success', message: 'GPU listing submitted successfully! Our team will review it shortly.' });
       navigate('/supplier/gpu-clusters');
     } catch (err) {
       addToast({ type: 'error', message: err.response?.data?.error || 'Failed to submit' });
@@ -168,7 +171,7 @@ export default function GpuClusterNewPage() {
           <Input label="Single Cluster Size (GPUs) *" name="singleClusterSize" type="number" value={s1.singleClusterSize} onChange={f(setS1)} />
           <Input label="Availability Date *" name="availabilityDate" type="date" value={s1.availabilityDate} onChange={f(setS1)} />
           <Input label="Restricted Use" name="restrictedUse" value={s1.restrictedUse} onChange={f(setS1)} />
-          <TextArea label="Notes *" name="notes" value={s1.notes} onChange={f(setS1)} className="sm:col-span-2" />
+          <TextArea label="Notes" name="notes" value={s1.notes} onChange={f(setS1)} className="sm:col-span-2" />
         </div>
       );
       case 1: return (
@@ -188,24 +191,34 @@ export default function GpuClusterNewPage() {
         </div>
       );
       case 2: return (
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Input label="Network Topology" name="computeNetTopology" value={s3.computeNetTopology} onChange={f(setS3)} />
-          <Input label="Network Technology *" name="computeNetTechnology" value={s3.computeNetTechnology} onChange={f(setS3)} />
-          <Input label="Switch Vendor" name="computeNetSwitchVendor" value={s3.computeNetSwitchVendor} onChange={f(setS3)} />
-          <Input label="Layers" name="computeNetLayers" value={s3.computeNetLayers} onChange={f(setS3)} />
-          <Input label="Oversubscription" name="computeNetOversubscription" value={s3.computeNetOversubscription} onChange={f(setS3)} />
-          <Input label="Scalability" name="computeNetScalability" value={s3.computeNetScalability} onChange={f(setS3)} />
-          <Input label="QoS" name="computeNetQos" value={s3.computeNetQos} onChange={f(setS3)} />
+        <div className="space-y-6">
+          <div>
+            <h3 className="font-semibold mb-4">Compute Network (Back-End, aka East-West)</h3>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Input label="Topology" name="computeNetTopology" value={s3.computeNetTopology} onChange={f(setS3)} />
+              <Input label="Technology" name="computeNetTechnology" value={s3.computeNetTechnology} onChange={f(setS3)} />
+              <Input label="Switch vendor" name="computeNetSwitchVendor" value={s3.computeNetSwitchVendor} onChange={f(setS3)} />
+              <Input label="Number of network layers (e.g., spine-leaf architecture)" name="computeNetLayers" value={s3.computeNetLayers} onChange={f(setS3)} />
+              <Input label="Oversubscription ratio" name="computeNetOversubscription" value={s3.computeNetOversubscription} onChange={f(setS3)} />
+              <Input label="Scalability plan for future expansion" name="computeNetScalability" value={s3.computeNetScalability} onChange={f(setS3)} />
+              <Input label="QoS configuration" name="computeNetQos" value={s3.computeNetQos} onChange={f(setS3)} className="sm:col-span-2" />
+            </div>
+          </div>
         </div>
       );
       case 3: return (
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Input label="Topology" name="mgmtNetTopology" value={s4.mgmtNetTopology} onChange={f(setS4)} />
-          <Input label="Technology" name="mgmtNetTechnology" value={s4.mgmtNetTechnology} onChange={f(setS4)} />
-          <Input label="Layers" name="mgmtNetLayers" type="number" value={s4.mgmtNetLayers} onChange={f(setS4)} />
-          <Input label="Switch Vendor" name="mgmtNetSwitchVendor" value={s4.mgmtNetSwitchVendor} onChange={f(setS4)} />
-          <Input label="Oversubscription" name="mgmtNetOversubscription" value={s4.mgmtNetOversubscription} onChange={f(setS4)} />
-          <Input label="Scalability" name="mgmtNetScalability" value={s4.mgmtNetScalability} onChange={f(setS4)} />
+        <div className="space-y-6">
+          <div>
+            <h3 className="font-semibold mb-4">Management Network (Front-End, aka North-South)</h3>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Input label="Topology" name="mgmtNetTopology" value={s4.mgmtNetTopology} onChange={f(setS4)} />
+              <Input label="Technology" name="mgmtNetTechnology" value={s4.mgmtNetTechnology} onChange={f(setS4)} />
+              <Input label="Number of network layers" name="mgmtNetLayers" type="number" value={s4.mgmtNetLayers} onChange={f(setS4)} />
+              <Input label="Switch vendor" name="mgmtNetSwitchVendor" value={s4.mgmtNetSwitchVendor} onChange={f(setS4)} />
+              <Input label="Oversubscription ratio" name="mgmtNetOversubscription" value={s4.mgmtNetOversubscription} onChange={f(setS4)} />
+              <Input label="Scalability plan for future expansion" name="mgmtNetScalability" value={s4.mgmtNetScalability} onChange={f(setS4)} />
+            </div>
+          </div>
         </div>
       );
       case 4: return (
@@ -219,16 +232,29 @@ export default function GpuClusterNewPage() {
         <TextArea label="Cluster Description" name="clusterDescription" value={s6.clusterDescription} onChange={f(setS6)} rows={8} />
       );
       case 6: return (
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Input label="Power Supply Status" name="powerSupplyStatus" value={s7.powerSupplyStatus} onChange={f(setS7)} />
-          <Input label="Rack Power Capacity (kW)" name="rackPowerCapacityKw" type="number" value={s7.rackPowerCapacityKw} onChange={f(setS7)} />
-          <Input label="Modular Data Halls" name="modularDataHalls" type="number" value={s7.modularDataHalls} onChange={f(setS7)} />
-          <Input label="Total Power Capacity (MW)" name="totalPowerCapacityMw" type="number" value={s7.totalPowerCapacityMw} onChange={f(setS7)} />
-          <Input label="Cooling Design" name="coolingDesign" value={s7.coolingDesign} onChange={f(setS7)} />
-          <Input label="Backup Generators" name="backupGenerators" value={s7.backupGenerators} onChange={f(setS7)} />
+        <div className="space-y-6">
+          <div>
+            <h3 className="font-semibold mb-4">Other</h3>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Input label="Cluster Name" name="clusterName" value={s7.clusterName} onChange={f(setS7)} />
+              <Input label="Cluster Identifier" name="clusterIdentifier" value={s7.clusterIdentifier} onChange={f(setS7)} />
+              <Input label="Redundancy" name="redundancy" value={s7.redundancy} onChange={f(setS7)} className="sm:col-span-2" />
+              <Input label="Failover" name="failover" value={s7.failover} onChange={f(setS7)} className="sm:col-span-2" />
+            </div>
+          </div>
         </div>
       );
       case 7: return (
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Input label="Power Supply Status" name="powerSupplyStatus" value={s8.powerSupplyStatus} onChange={f(setS8)} />
+          <Input label="Rack Power Capacity (kW)" name="rackPowerCapacityKw" type="number" value={s8.rackPowerCapacityKw} onChange={f(setS8)} />
+          <Input label="Modular Data Halls" name="modularDataHalls" type="number" value={s8.modularDataHalls} onChange={f(setS8)} />
+          <Input label="Total Power Capacity (MW)" name="totalPowerCapacityMw" type="number" value={s8.totalPowerCapacityMw} onChange={f(setS8)} />
+          <Input label="Cooling Design" name="coolingDesign" value={s8.coolingDesign} onChange={f(setS8)} />
+          <Input label="Backup Generators" name="backupGenerators" value={s8.backupGenerators} onChange={f(setS8)} />
+        </div>
+      );
+      case 8: return (
         <div className="space-y-4">
           <p className="text-gray-500">Review and submit your GPU listing.</p>
           <Card>
@@ -248,7 +274,7 @@ export default function GpuClusterNewPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold mb-6">New GPU Listing</h1>
+        <h1 className="text-2xl font-bold mb-6">New GPU Capacity Listing</h1>
         <Stepper steps={STEPS} currentStep={step} />
       </div>
       <Card className="mb-6">

@@ -35,8 +35,8 @@ export default function SupplierSettingsPage() {
   const saveProfile = async () => {
     setSaving(true);
     try {
-      const { contactEmail, contactNumber, vendorType, mandateStatus, ndaRequired, ndaSigned } = profile;
-      await api.put('/supplier/profile', { contactEmail, contactNumber, vendorType, mandateStatus, ndaRequired, ndaSigned });
+      const { contactEmail, contactNumber, vendorType, mandateStatus } = profile;
+      await api.put('/supplier/profile', { contactEmail, contactNumber, vendorType, mandateStatus });
       addToast({ type: 'success', message: 'Profile updated' });
     } catch (err) {
       addToast({ type: 'error', message: err.response?.data?.error || 'Failed to save' });
@@ -100,7 +100,7 @@ export default function SupplierSettingsPage() {
             <p className="font-medium capitalize">{user?.role}</p>
           </div>
           <div>
-            <p className="text-sm text-[var(--color-text-secondary)]">KYC Status</p>
+            <p className="text-sm text-[var(--color-text-secondary)]">Account Status</p>
             <Badge status={profile?.status} />
           </div>
         </div>
@@ -117,7 +117,7 @@ export default function SupplierSettingsPage() {
             onChange={(e) => handleChange('contactEmail', e.target.value)}
           />
           <PhoneInput
-            label="Contact Number"
+            label="Contact Number *"
             value={profile?.contactNumber || ''}
             onChange={(e) => handleChange('contactNumber', e.target.value)}
             name="contactNumber"
@@ -149,26 +149,6 @@ export default function SupplierSettingsPage() {
                 ))}
               </select>
             </div>
-          </div>
-          <div className="flex gap-6">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={profile?.ndaRequired || false}
-                onChange={(e) => handleChange('ndaRequired', e.target.checked)}
-                className="rounded"
-              />
-              <span className="text-sm">NDA Required</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={profile?.ndaSigned || false}
-                onChange={(e) => handleChange('ndaSigned', e.target.checked)}
-                className="rounded"
-              />
-              <span className="text-sm">NDA Signed</span>
-            </label>
           </div>
           <div className="flex justify-end">
             <Button onClick={saveProfile} loading={saving}>Save Changes</Button>

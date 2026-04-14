@@ -59,4 +59,24 @@ const deleteFile = async (key) => {
   await s3.send(command);
 };
 
-module.exports = { getUploadPresignedUrl, getDownloadPresignedUrl, deleteFile };
+const uploadFile = async (orgId, entityType, entityId, file) => {
+  const sanitized = sanitizeFileName(file.originalname);
+  const key = `${orgId}/${entityType}/${entityId}/${sanitized}`;
+
+  const command = new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    Body: file.buffer,
+    ContentType: file.mimetype,
+  });
+
+  await s3.send(command);
+  return { key, fileName: sanitized };
+};
+
+module.exports = {
+  getUploadPresignedUrl,
+  getDownloadPresignedUrl,
+  deleteFile,
+  uploadFile
+};

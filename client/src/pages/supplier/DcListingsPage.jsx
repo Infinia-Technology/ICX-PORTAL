@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Building2 } from 'lucide-react';
+import { Plus, Building2, RefreshCw } from 'lucide-react';
 import api from '../../lib/api';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/Spinner';
 import DataTable from '../../components/ui/DataTable';
+import { useToast } from '../../components/ui/Toast';
 
 const STATUS_VARIANT = {
   DRAFT: 'default', SUBMITTED: 'info', IN_REVIEW: 'warning',
@@ -14,18 +15,50 @@ const STATUS_VARIANT = {
   APPROVED: 'success', REJECTED: 'error',
 };
 
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+const isOutdated = (listing) => {
+  if (listing.status !== 'APPROVED' || listing.isArchived) return false;
+  const lastActivity = new Date(listing.lastActivityAt || listing.updatedAt);
+  return (Date.now() - lastActivity.getTime()) > THIRTY_DAYS_MS;
+};
+
 export default function DcListingsPage() {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(null);
+  const { addToast } = useToast();
 
-  useEffect(() => {
+  const load = () => {
     api.get('/dc-applications').then((r) => setApplications(r.data.data || r.data)).catch(console.error).finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(load, []);
+
+  const handleRefresh = async (id) => {
+    setRefreshing(id);
+    try {
+      await api.post(`/dc-applications/${id}/refresh`);
+      addToast({ type: 'success', message: 'Listing refreshed' });
+      load();
+    } catch {
+      addToast({ type: 'error', message: 'Failed to refresh' });
+    } finally {
+      setRefreshing(null);
+    }
+  };
 
   const columns = [
     { key: 'companyLegalEntity', label: 'Company', render: (v, row) => v || <span className="text-gray-400">Untitled Draft</span> },
     { key: 'contactEmail', label: 'Contact' },
-    { key: 'status', label: 'Status', render: (v) => <Badge variant={STATUS_VARIANT[v] || 'default'}>{v?.replace(/_/g, ' ')}</Badge> },
+    {
+      key: 'status', label: 'Status', render: (v, row) => (
+        <div className="flex items-center gap-2">
+          <Badge variant={STATUS_VARIANT[v] || 'default'}>{v?.replace(/_/g, ' ')}</Badge>
+          {isOutdated(row) && <Badge variant="warning">Outdated</Badge>}
+        </div>
+      ),
+    },
     { key: 'createdAt', label: 'Created', render: (v) => new Date(v).toLocaleDateString() },
     {
       key: '_id', label: 'Actions', render: (v, row) => (
@@ -33,6 +66,17 @@ export default function DcListingsPage() {
           <Link to={`/supplier/dc-listings/${v}`}><Button size="sm" variant="ghost">View</Button></Link>
           {['DRAFT', 'REVISION_REQUESTED'].includes(row.status) && (
             <Link to={`/supplier/dc-listings/${v}/edit`}><Button size="sm">Edit</Button></Link>
+          )}
+          {isOutdated(row) && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => handleRefresh(v)}
+              loading={refreshing === v}
+              title="Confirm listing data is still current"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </Button>
           )}
         </div>
       ),

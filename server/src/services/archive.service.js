@@ -1,71 +1,81 @@
-const Archive = require('../models/Archive');
-const DcApplication = require('../models/DcApplication');
-const GpuClusterListing = require('../models/GpuClusterListing');
+const prisma = require('../config/prisma');
 const { logAction } = require('./audit.service');
 
 // Archive a listing
 const archiveListing = async ({
   targetModel, targetId, organizationId, archivedBy, reason, reasonText,
 }) => {
-  const modelMap = {
-    DcApplication,
-    GpuClusterListing,
-  };
+  // Since DC and GPU are now both in the 'listing' table in Prisma:
+  const targetType = 'Listing'; 
 
-  const Model = modelMap[targetModel];
-  if (!Model) throw new Error(`Invalid target model: ${targetModel}`);
+  // Atomic transaction
+  const result = await prisma.$transaction(async (tx) => {
+    // Create archive record
+    const archive = await tx.archive.create({
+      data: {
+        target_model: targetType,
+        target_id: targetId,
+        organization_id: organizationId,
+        archived_by: archivedBy,
+        reason,
+        reason_text: reasonText,
+        isActive: true
+      }
+    });
 
-  // Create archive record
-  const archive = new Archive({
-    targetModel,
-    targetId,
-    organizationId,
-    archivedBy,
-    reason,
-    reasonText,
+    // Update listing
+    await tx.listing.update({
+      where: { id: targetId },
+      data: {
+        status: 'ARCHIVED',
+        archived_at: new Date(),
+        archive_reason: reason
+      }
+    });
+
+    return archive;
   });
-  await archive.save();
 
-  // Update listing
-  await Model.findByIdAndUpdate(targetId, {
-    isArchived: true,
-    archivedAt: new Date(),
-    archivedBy,
-    archivedReason: reason,
-  });
-
-  return archive;
+  return result;
 };
 
 // Restore a listing (unarchive)
-const restoreListing = async ({ targetModel, targetId, restoredBy }) => {
-  const modelMap = {
-    DcApplication,
-    GpuClusterListing,
-  };
+const restoreListing = async ({ targetId, restoredBy }) => {
+  // Atomic transaction
+  const result = await prisma.$transaction(async (tx) => {
+    // Update archive record
+    const archive = await tx.archive.findFirst({
+      where: { target_id: targetId, isActive: true },
+      orderBy: { archived_at: 'desc' }
+    });
 
-  const Model = modelMap[targetModel];
-  if (!Model) throw new Error(`Invalid target model: ${targetModel}`);
+    if (!archive) throw new Error('Active archive record not found');
 
-  // Update archive record
-  const archive = await Archive.findOneAndUpdate(
-    { targetModel, targetId, isActive: true },
-    { isActive: false, restoredAt: new Date(), restoredBy },
-    { new: true },
-  );
+    const updatedArchive = await tx.archive.update({
+      where: { id: archive.id },
+      data: { 
+        isActive: false, 
+        restored_at: new Date(), 
+        restored_by: restoredBy 
+      }
+    });
 
-  if (!archive) throw new Error('Active archive record not found');
+    // Update listing back to DRAFT or APPROVED? 
+    // Legacy restored it but didn't explicitly set a status other than unarchiving.
+    // We'll set it to DRAFT for safety unless specific logic dictates otherwise.
+    await tx.listing.update({
+      where: { id: targetId },
+      data: {
+        status: 'DRAFT',
+        archived_at: null,
+        archive_reason: null
+      }
+    });
 
-  // Update listing
-  await Model.findByIdAndUpdate(targetId, {
-    isArchived: false,
-    archivedAt: null,
-    archivedBy: null,
-    archivedReason: null,
-    lastActivityAt: new Date(),
+    return updatedArchive;
   });
 
-  return archive;
+  return result;
 };
 
 // Auto-archive inactive listings (3 months with no updates)
@@ -73,28 +83,22 @@ const autoArchiveInactive = async () => {
   const threeMonthsAgo = new Date();
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
-  const inactiveListings = await Promise.all([
-    DcApplication.find({
-      isArchived: false,
-      updatedAt: { $lt: threeMonthsAgo },
-      status: 'APPROVED',
-    }),
-    GpuClusterListing.find({
-      isArchived: false,
-      updatedAt: { $lt: threeMonthsAgo },
-      status: 'APPROVED',
-    }),
-  ]);
+  const inactiveListings = await prisma.listing.findMany({
+    where: {
+      archived_at: null,
+      updated_at: { lt: threeMonthsAgo },
+      status: 'APPROVED'
+    }
+  });
 
   const results = { archived: 0, failed: 0 };
 
-  // Archive DcApplications
-  for (const listing of inactiveListings[0]) {
+  for (const listing of inactiveListings) {
     try {
       await archiveListing({
-        targetModel: 'DcApplication',
-        targetId: listing._id,
-        organizationId: listing.organizationId,
+        targetModel: 'Listing',
+        targetId: listing.id,
+        organizationId: listing.organization_id,
         archivedBy: null, // System
         reason: 'INACTIVITY',
         reasonText: 'Auto-archived due to 3 months of inactivity',
@@ -102,25 +106,7 @@ const autoArchiveInactive = async () => {
       results.archived += 1;
     } catch (err) {
       results.failed += 1;
-      console.error(`Failed to auto-archive DcApplication ${listing._id}:`, err);
-    }
-  }
-
-  // Archive GpuClusterListings
-  for (const listing of inactiveListings[1]) {
-    try {
-      await archiveListing({
-        targetModel: 'GpuClusterListing',
-        targetId: listing._id,
-        organizationId: listing.organizationId,
-        archivedBy: null, // System
-        reason: 'INACTIVITY',
-        reasonText: 'Auto-archived due to 3 months of inactivity',
-      });
-      results.archived += 1;
-    } catch (err) {
-      results.failed += 1;
-      console.error(`Failed to auto-archive GpuClusterListing ${listing._id}:`, err);
+      console.error(`Failed to auto-archive Listing ${listing.id}:`, err);
     }
   }
 
@@ -128,11 +114,15 @@ const autoArchiveInactive = async () => {
 };
 
 // Get archive history for a listing
-const getArchiveHistory = async (targetModel, targetId) => {
-  return Archive.find({ targetModel, targetId })
-    .populate('archivedBy', 'email')
-    .populate('restoredBy', 'email')
-    .sort('-archivedAt');
+const getArchiveHistory = async (targetId) => {
+  return prisma.archive.findMany({
+    where: { target_id: targetId },
+    include: {
+      user_archived: { select: { email: true } },
+      user_restored: { select: { email: true } }
+    },
+    orderBy: { archived_at: 'desc' }
+  });
 };
 
 module.exports = {

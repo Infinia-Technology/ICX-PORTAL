@@ -18,7 +18,6 @@ import ErrorPage from './pages/public/ErrorPage';
 
 // Supplier pages
 import SupplierDashboard from './pages/supplier/SupplierDashboard';
-import KycWaitingPage from './pages/supplier/KycWaitingPage';
 import DcListingsPage from './pages/supplier/DcListingsPage';
 import DcListingNewPage from './pages/supplier/DcListingNewPage';
 import DcListingDetailPage from './pages/supplier/DcListingDetailPage';
@@ -43,7 +42,7 @@ import DcRequestNewPage from './pages/customer/DcRequestNewPage';
 import CustomerSettingsPage from './pages/customer/CustomerSettingsPage';
 
 // Admin pages
-import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminWorkspace from './pages/admin/AdminWorkspace';
 import QueuePage from './pages/admin/QueuePage';
 import QueueReviewPage from './pages/admin/QueueReviewPage';
 import SuppliersPage from './pages/admin/SuppliersPage';
@@ -63,6 +62,7 @@ import ReadersPage from './pages/admin/ReadersPage';
 import AuditLogPage from './pages/admin/AuditLogPage';
 import UsersPage from './pages/admin/UsersPage';
 import AdminSettingsPage from './pages/admin/AdminSettingsPage';
+import ReportsPage from './pages/admin/ReportsPage';
 
 // Reader pages
 import ReaderMarketplacePage from './pages/reader/ReaderMarketplacePage';
@@ -91,7 +91,6 @@ export default function App() {
               </ProtectedRoute>
             }>
               <Route path="/supplier/dashboard" element={<SupplierDashboard />} />
-              <Route path="/supplier/kyc-waiting" element={<KycWaitingPage />} />
               <Route path="/supplier/dc-listings" element={<DcListingsPage />} />
               <Route path="/supplier/dc-listings/new" element={<DcListingNewPage />} />
               <Route path="/supplier/dc-listings/:id" element={<DcListingDetailPage />} />
@@ -128,8 +127,8 @@ export default function App() {
                 <DashboardLayout />
               </ProtectedRoute>
             }>
-              <Route path="/admin/dashboard" element={<AdminDashboard />} />
-              <Route path="/admin/queue" element={<QueuePage />} />
+              <Route path="/admin/dashboard" element={<AdminWorkspace />} />
+              <Route path="/admin/queue" element={<AdminWorkspace />} />
               <Route path="/admin/queue/:id" element={<QueueReviewPage />} />
               <Route path="/admin/suppliers" element={<SuppliersPage />} />
               <Route path="/admin/suppliers/:id" element={<SupplierDetailPage />} />
@@ -147,6 +146,7 @@ export default function App() {
               <Route path="/admin/readers" element={<ReadersPage />} />
               <Route path="/admin/audit-log" element={<AuditLogPage />} />
               <Route path="/admin/users" element={<UsersPage />} />
+              <Route path="/admin/reports" element={<ReportsPage />} />
               <Route path="/admin/settings" element={<AdminSettingsPage />} />
             </Route>
 

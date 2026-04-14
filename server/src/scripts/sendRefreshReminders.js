@@ -1,16 +1,10 @@
 require('dotenv').config();
-const mongoose = require('mongoose');
-const db = require('../config/db');
-const DcApplication = require('../models/DcApplication');
-const GpuClusterListing = require('../models/GpuClusterListing');
-const User = require('../models/User');
+const prisma = require('../config/prisma');
 const { notifyRefreshReminder } = require('../services/notification.service');
 
 const run = async () => {
   try {
     console.log('Starting send refresh reminders job...');
-
-    await db();
 
     // Lookback period: 15-30 days
     const thirtyDaysAgo = new Date();
@@ -19,65 +13,42 @@ const run = async () => {
     const fifteenDaysAgo = new Date();
     fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
 
-    // Find DC Applications that haven't been updated in 15-30 days and are approved
-    const dcListings = await DcApplication.find({
-      status: 'APPROVED',
-      isArchived: false,
-      lastActivityAt: { $gte: thirtyDaysAgo, $lte: fifteenDaysAgo },
-    }).populate('organizationId', '_id');
-
-    console.log(`Found ${dcListings.length} DC listings needing refresh reminder`);
-
-    for (const listing of dcListings) {
-      try {
-        const user = await User.findOne({ organizationId: listing.organizationId._id });
-        if (user) {
-          const daysInactive = Math.floor(
-            (new Date() - new Date(listing.lastActivityAt)) / (1000 * 60 * 60 * 24),
-          );
-          await notifyRefreshReminder({
-            userId: user._id,
-            organizationId: listing.organizationId._id,
-            listingName: listing.companyLegalEntity || 'Your DC Listing',
-            listingType: 'DC',
-            listingId: listing._id,
-            daysInactive,
-          });
-          console.log(`Sent refresh reminder for DC listing ${listing._id}`);
-        }
-      } catch (err) {
-        console.error(`Failed to send reminder for DC listing ${listing._id}:`, err);
+    // Find all listings (DC & GPU) that haven't been updated in 15-30 days and are approved
+    const listings = await prisma.listing.findMany({
+      where: {
+        status: 'APPROVED',
+        archived_at: null,
+        updated_at: { gte: thirtyDaysAgo, lte: fifteenDaysAgo },
       }
-    }
+    });
 
-    // Find GPU Cluster Listings that haven't been updated in 15-30 days and are approved
-    const gpuListings = await GpuClusterListing.find({
-      status: 'APPROVED',
-      isArchived: false,
-      lastActivityAt: { $gte: thirtyDaysAgo, $lte: fifteenDaysAgo },
-    }).populate('organizationId', '_id');
+    console.log(`Found ${listings.length} listings needing refresh reminder`);
 
-    console.log(`Found ${gpuListings.length} GPU listings needing refresh reminder`);
-
-    for (const listing of gpuListings) {
+    for (const listing of listings) {
       try {
-        const user = await User.findOne({ organizationId: listing.organizationId._id });
+        // Find the owner user of the organization
+        const user = await prisma.user.findFirst({ 
+          where: { organization_id: listing.organization_id } 
+        });
+        
         if (user) {
           const daysInactive = Math.floor(
-            (new Date() - new Date(listing.lastActivityAt)) / (1000 * 60 * 60 * 24),
+            (new Date() - new Date(listing.updated_at)) / (1000 * 60 * 60 * 24),
           );
+          
           await notifyRefreshReminder({
-            userId: user._id,
-            organizationId: listing.organizationId._id,
-            listingName: listing.vendorName || 'Your GPU Listing',
-            listingType: 'GPU',
-            listingId: listing._id,
+            userId: user.id,
+            organizationId: listing.organization_id,
+            listingName: listing.data_center_name || listing.name || 'Your Listing',
+            listingType: listing.type === 'DC_SITE' ? 'DC' : 'GPU',
+            listingId: listing.id,
             daysInactive,
           });
-          console.log(`Sent refresh reminder for GPU listing ${listing._id}`);
+          
+          console.log(`Sent refresh reminder for ${listing.type} listing ${listing.id}`);
         }
       } catch (err) {
-        console.error(`Failed to send reminder for GPU listing ${listing._id}:`, err);
+        console.error(`Failed to send reminder for listing ${listing.id}:`, err);
       }
     }
 

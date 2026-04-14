@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
 
 // Route imports
@@ -28,9 +27,6 @@ const PORT = process.env.PORT || 5000;
 
 // Trust proxy (nginx in Docker)
 app.set('trust proxy', 1);
-
-// Connect to MongoDB
-connectDB();
 
 // Middleware
 app.use(cors({
@@ -68,6 +64,9 @@ app.use('/api/account', accountRoutes);
 
 // Error handler (must be last)
 app.use(errorHandler);
+
+// Start cron jobs
+require('./cron');
 
 app.listen(PORT, () => {
   console.log(`ICX Portal server running on port ${PORT}`);

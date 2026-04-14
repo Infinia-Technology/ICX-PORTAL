@@ -8,7 +8,7 @@ import TextArea from '../../components/ui/TextArea';
 import Spinner from '../../components/ui/Spinner';
 import { useToast } from '../../components/ui/Toast';
 
-const STATUS_VARIANT = { PENDING: 'default', KYC_SUBMITTED: 'info', APPROVED: 'success', REJECTED: 'error', REVISION_REQUESTED: 'warning' };
+const STATUS_VARIANT = { PENDING: 'default', SUBMITTED: 'info', APPROVED: 'success', REJECTED: 'error', REVISION_REQUESTED: 'warning' };
 const Field = ({ label, value }) => (<div><dt className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">{label}</dt><dd className="text-sm">{value || '—'}</dd></div>);
 
 export default function CustomerDetailPage() {
@@ -67,7 +67,7 @@ export default function CustomerDetailPage() {
         </dl>
       </Card>
 
-      {['KYC_SUBMITTED', 'REVISION_REQUESTED'].includes(data.status) && (
+      {['SUBMITTED', 'REVISION_REQUESTED'].includes(data.status) && (
         <Card>
           <h2 className="font-semibold mb-4">Verification Decision</h2>
           <TextArea label="Reason / Comments" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Optional reason..." rows={3} />
