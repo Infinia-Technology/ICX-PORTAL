@@ -373,18 +373,18 @@ export default function DcListingNewPage() {
       case 5:
         return (
           <div className="grid sm:grid-cols-2 gap-4">
-            <Checkbox label="Carrier Neutrality" name="carrierNeutral" checked={step6.carrierNeutral} onChange={f(setStep6)} />
-            <Input label="Number of Carriers on-net" name="carriersOnNet" type="number" value={step6.carriersOnNet} onChange={f(setStep6)} placeholder="Whole numbers only" />
-            <TextArea label="Carriers available on site" name="carriersAvailable" value={step6.carriersAvailable} onChange={f(setStep6)} />
-            <Checkbox label="Dark Fibre Availability" name="darkFibreAvailable" checked={step6.darkFibreAvailable} onChange={f(setStep6)} />
+            <Checkbox label="Carrier Neutrality *" name="carrierNeutral" checked={step6.carrierNeutral} onChange={f(setStep6)} />
+            <Input label="Carriers On-Net" name="carriersOnNet" type="number" value={step6.carriersOnNet} onChange={f(setStep6)} placeholder="Whole numbers only" />
+            <TextArea label="Carriers Available on site" name="carriersAvailable" value={step6.carriersAvailable} onChange={f(setStep6)} className="sm:col-span-2" />
+            <TextArea label="Meet-Me-Room Description" name="mmrDescription" value={step6.mmrDescription} onChange={f(setStep6)} className="sm:col-span-2" maxLength="2000" placeholder="Maximum 2000 characters" />
+            <Select label="MMR Redundancy" name="mmrRedundancy" value={step6.mmrRedundancy} onChange={f(setStep6)} options={['', 'Single', 'Redundant', 'Unknown'].map((o) => ({ value: o, label: o || 'Select...' }))} />
+            <Select label="Cross-connect Availability" name="crossConnectAvail" value={step6.crossConnectAvail} onChange={f(setStep6)} options={['', 'Yes', 'No', 'Planned'].map((o) => ({ value: o, label: o || 'Select...' }))} />
+            <Input label="Distance to IX (km)" name="distanceToIxKm" type="number" value={step6.distanceToIxKm} onChange={f(setStep6)} placeholder="Whole numbers only" />
+            <Input label="Latency (ms)" name="latencyMs" type="number" value={step6.latencyMs} onChange={f(setStep6)} placeholder="Whole numbers only" />
+            <Input label="Latency Destination" name="latencyDestination" value={step6.latencyDestination} onChange={f(setStep6)} className="sm:col-span-2" />
             <TextArea label="Fiber Entry Points (Connectivity)" name="fiberEntryPoints" value={step6.fiberEntryPoints} onChange={f(setStep6)} className="sm:col-span-2" />
-            <TextArea label="Meet-Me-Room description" name="mmrDescription" value={step6.mmrDescription} onChange={f(setStep6)} className="sm:col-span-2" maxLength="2000" placeholder="Maximum 2000 characters" />
-            <Select label="MMR redundancy" name="mmrRedundancy" value={step6.mmrRedundancy} onChange={f(setStep6)} options={['', 'Single', 'Redundant', 'Unknown'].map((o) => ({ value: o, label: o || 'Select...' }))} />
-            <TextArea label="Connectivity detailed mapping" name="connectivityMapping" value={step6.connectivityMapping} onChange={f(setStep6)} className="sm:col-span-2" maxLength="2000" placeholder="Maximum 2000 characters" />
-            <Input label="Distance to nearest major IX / network hub, km" name="distanceToIxKm" type="number" value={step6.distanceToIxKm} onChange={f(setStep6)} placeholder="Whole numbers only" />
-            <Select label="Cross-connect availability" name="crossConnectAvail" value={step6.crossConnectAvail} onChange={f(setStep6)} options={['', 'Yes', 'No', 'Planned'].map((o) => ({ value: o, label: o || 'Select...' }))} />
-            <Input label="Latency, ms, one way" name="latencyMs" type="number" value={step6.latencyMs} onChange={f(setStep6)} />
-            <Input label="Latency destination" name="latencyDestination" value={step6.latencyDestination} onChange={f(setStep6)} />
+            <Checkbox label="Dark Fibre Availability" name="darkFibreAvailable" checked={step6.darkFibreAvailable} onChange={f(setStep6)} />
+            <TextArea label="Connectivity Detailed Mapping" name="connectivityMapping" value={step6.connectivityMapping} onChange={f(setStep6)} className="sm:col-span-2" maxLength="2000" placeholder="Maximum 2000 characters" />
           </div>
         );
       case 6:
