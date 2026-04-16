@@ -36,10 +36,16 @@ const listDemands = async (req, res, next) => {
     if (status) where.status = status;
 
     const result = await paginatePrisma(prisma.inquiry, where, page, limit);
-    
-    // Compatibility mapping
-    result.data = result.data.map(d => ({ ...d, _id: d.id, organizationId: d.organization_id, submittedBy: d.user_id }));
-    
+
+    result.data = result.data.map(d => ({
+      ...d,
+      ...(d.specifications || {}),
+      _id: d.id,
+      createdAt: d.created_at,
+      updatedAt: d.updated_at,
+      organizationId: d.organization_id,
+    }));
+
     res.json(result);
   } catch (err) { next(err); }
 };
@@ -53,7 +59,7 @@ const createDemand = async (req, res, next) => {
         user_id: req.user.userId,
         type: 'GPU_DEMAND',
         status: 'DRAFT',
-        details: req.body
+        specifications: req.body
       }
     });
 
@@ -95,7 +101,7 @@ const updateDemand = async (req, res, next) => {
 
     const updated = await prisma.inquiry.update({
       where: { id: demand.id },
-      data: { details: req.body }
+      data: { specifications: req.body }
     });
     res.json({ ...updated, _id: updated.id });
   } catch (err) { next(err); }
@@ -122,7 +128,7 @@ const submitDemand = async (req, res, next) => {
       data: { status: 'SUBMITTED' }
     });
 
-    await createQueueItem({ type: 'GPU_DEMAND', referenceId: demand.id, referenceModel: 'Inquiry' });
+    try { await createQueueItem({ type: 'GPU_DEMAND', referenceId: demand.id, referenceModel: 'Inquiry' }); } catch (qErr) { console.warn('[QUEUE] GPU_DEMAND queue item skipped:', qErr.message); }
     await logAction({ userId: req.user.userId, action: 'SUBMIT_GPU_DEMAND', targetModel: 'Inquiry', targetId: demand.id, ipAddress: req.ip });
     res.json({ message: 'GPU demand submitted', status: updated.status });
   } catch (err) { next(err); }

@@ -9,7 +9,24 @@ import Spinner from '../../components/ui/Spinner';
 import { useToast } from '../../components/ui/Toast';
 
 const STATUS_VARIANT = { PENDING: 'default', SUBMITTED: 'info', APPROVED: 'success', REJECTED: 'error', REVISION_REQUESTED: 'warning' };
-const Field = ({ label, value }) => (<div><dt className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">{label}</dt><dd className="text-sm">{value || '—'}</dd></div>);
+
+const Field = ({ label, value }) => (
+  <div>
+    <dt className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">{label}</dt>
+    <dd className="text-sm">{value || '—'}</dd>
+  </div>
+);
+
+const ArrayField = ({ label, value }) => (
+  <div>
+    <dt className="text-xs text-gray-500 uppercase tracking-wide mb-1">{label}</dt>
+    <dd className="flex flex-wrap gap-1">
+      {value?.length
+        ? value.map((v) => <Badge key={v} variant="default" className="text-xs">{v}</Badge>)
+        : <span className="text-sm">—</span>}
+    </dd>
+  </div>
+);
 
 export default function CustomerDetailPage() {
   const { id } = useParams();
@@ -53,6 +70,7 @@ export default function CustomerDetailPage() {
         <Button variant="ghost" onClick={() => navigate('/admin/customers')}>Back</Button>
       </div>
 
+      {/* Company Information */}
       <Card>
         <h2 className="font-semibold mb-4">Company Information</h2>
         <dl className="grid sm:grid-cols-3 gap-4">
@@ -60,13 +78,56 @@ export default function CustomerDetailPage() {
           <Field label="Company Type" value={data.companyType} />
           <Field label="Jurisdiction" value={data.jurisdiction} />
           <Field label="Industry Sector" value={data.industrySector} />
-          <Field label="Tax/VAT Number" value={data.taxVatNumber} />
+          <Field label="Tax / VAT Number" value={data.taxVatNumber} />
           <Field label="Website" value={data.website} />
-          <Field label="Auth Signatory" value={data.authSignatoryName} />
-          <Field label="Billing Contact" value={data.billingContactEmail} />
+          <Field label="Company Address" value={data.companyAddress} />
+          <Field label="Contact Email" value={data.contactEmail} />
         </dl>
       </Card>
 
+      {/* Authorised Signatory & Billing */}
+      <Card>
+        <h2 className="font-semibold mb-4">Signatory & Billing</h2>
+        <dl className="grid sm:grid-cols-2 gap-4">
+          <Field label="Auth Signatory Name" value={data.authSignatoryName} />
+          <Field label="Auth Signatory Title" value={data.authSignatoryTitle} />
+          <Field label="Billing Contact Name" value={data.billingContactName} />
+          <Field label="Billing Contact Email" value={data.billingContactEmail} />
+        </dl>
+      </Card>
+
+      {/* Requirements */}
+      <Card>
+        <h2 className="font-semibold mb-4">Requirements</h2>
+        <dl className="grid sm:grid-cols-2 gap-4">
+          <ArrayField label="Primary Use Cases" value={data.primaryUseCases} />
+          <ArrayField label="Location Preferences" value={data.locationPreferences} />
+          <ArrayField label="Sovereignty Requirements" value={data.sovereigntyReqs} />
+          <ArrayField label="Compliance Requirements" value={data.complianceReqs} />
+          <Field label="Budget Range" value={data.budgetRange} />
+          <Field label="Urgency" value={data.urgency} />
+        </dl>
+      </Card>
+
+      {/* Team Members */}
+      {data.users?.length > 0 && (
+        <Card>
+          <h2 className="font-semibold mb-4">Users</h2>
+          <div className="space-y-2">
+            {data.users.map((u) => (
+              <div key={u.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                <span className="text-sm">{u.email}</span>
+                <div className="flex gap-2">
+                  <Badge variant="default">{u.role}</Badge>
+                  <Badge variant={u.isActive ? 'success' : 'error'}>{u.isActive ? 'Active' : 'Inactive'}</Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Verification Decision */}
       {['SUBMITTED', 'REVISION_REQUESTED'].includes(data.status) && (
         <Card>
           <h2 className="font-semibold mb-4">Verification Decision</h2>

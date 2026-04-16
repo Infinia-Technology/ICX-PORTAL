@@ -68,6 +68,7 @@ export default function AdminDcListingsPage() {
             Show Archived
           </label>
           <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} options={[{ value: '', label: 'All Statuses' }, 'DRAFT', 'SUBMITTED', 'IN_REVIEW', 'RESUBMITTED', 'APPROVED', 'REJECTED', 'REVISION_REQUESTED'].map((o) => typeof o === 'string' ? { value: o, label: o.replace(/_/g, ' ') } : o)} />
+          <Link to="/admin/dc-listings/new"><Button variant="primary">+ New DC Listing</Button></Link>
         </div>
       </div>
       {loading ? <div className="flex justify-center py-20"><Spinner size="lg" /></div> : <DataTable columns={columns} data={listings} />}

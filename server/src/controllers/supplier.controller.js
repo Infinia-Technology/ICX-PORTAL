@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const crypto = require('crypto');
 const prisma = require('../config/prisma');
 const { logAction } = require('../services/audit.service');
 const { sendEmail } = require('../services/email.service');
@@ -105,25 +106,36 @@ const inviteTeamMember = async (req, res, next) => {
     });
     if (existingInvite) return res.status(409).json({ error: 'Invite already sent to this email' });
 
+    // Generate a secure random token (expires in 48h)
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+
     const invite = await prisma.teamInvite.create({
       data: {
         organization_id: req.user.organization_id,
         inviter_id: req.user.userId,
         email,
-        role
+        role,
+        token,
+        expires_at: expiresAt,
       }
     });
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (!existingUser) {
-      await sendEmail(email, 'ICX Portal — Team Invitation', `
+      // New user — send invite link so they can create their account
+      const inviteLink = `${process.env.CLIENT_URL}/invite/${token}`;
+      await sendEmail(email, 'Compute Exchange — Team Invitation', `
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
-          <h2 style="color: #1a1a2e;">ICX Portal</h2>
-          <p>You have been invited to join an organization on ICX Portal as a team member.</p>
-          <a href="${process.env.CLIENT_URL}/login" style="display: inline-block; padding: 12px 24px; background: #1a1a2e; color: #fff; text-decoration: none; border-radius: 6px; margin-top: 16px;">Accept Invitation</a>
+          <h2 style="color: #1a1a2e;">Compute Exchange</h2>
+          <p>You have been invited to join an organization on Compute Exchange as a <strong>${role}</strong>.</p>
+          <p>Click the button below to accept the invitation. This link expires in 48 hours.</p>
+          <a href="${inviteLink}" style="display: inline-block; padding: 12px 24px; background: #1a1a2e; color: #fff; text-decoration: none; border-radius: 6px; margin-top: 16px;">Accept Invitation</a>
+          <p style="color: #999; font-size: 12px; margin-top: 24px;">If the button doesn't work, copy this link: ${inviteLink}</p>
         </div>
       `).catch(console.error);
     } else {
+      // Existing user — link them directly and mark accepted
       await prisma.user.update({
         where: { id: existingUser.id },
         data: { organization_id: req.user.organization_id, role: role }
@@ -143,7 +155,7 @@ const inviteTeamMember = async (req, res, next) => {
 const revokeTeamMember = async (req, res, next) => {
   try {
     const invite = await prisma.teamInvite.findFirst({
-      where: { id: req.params.inviteId, organization_id: req.user.organization_id }
+      where: { id: req.params.id, organization_id: req.user.organization_id }
     });
     if (!invite) return res.status(404).json({ error: 'Invite not found' });
 
@@ -239,8 +251,40 @@ const updateBrokerCompany = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// GET /api/supplier/analytics
+const getAnalytics = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const [
+      totalDcListings, approvedDcListings, pendingDcListings, draftDcListings, rejectedDcListings,
+      totalGpuListings, approvedGpuListings, pendingGpuListings, draftGpuListings,
+      totalInventory, availableInventory, reservedInventory, soldInventory,
+    ] = await Promise.all([
+      prisma.listing.count({ where: { supplier_id: userId, type: 'DC_SITE', archived_at: null } }),
+      prisma.listing.count({ where: { supplier_id: userId, type: 'DC_SITE', status: 'APPROVED', archived_at: null } }),
+      prisma.listing.count({ where: { supplier_id: userId, type: 'DC_SITE', status: { in: ['SUBMITTED', 'IN_REVIEW', 'REVISION_REQUESTED', 'RESUBMITTED'] }, archived_at: null } }),
+      prisma.listing.count({ where: { supplier_id: userId, type: 'DC_SITE', status: 'DRAFT', archived_at: null } }),
+      prisma.listing.count({ where: { supplier_id: userId, type: 'DC_SITE', status: 'REJECTED', archived_at: null } }),
+      prisma.listing.count({ where: { supplier_id: userId, type: 'GPU_CLUSTER', total_units: { lte: 0 }, archived_at: null } }),
+      prisma.listing.count({ where: { supplier_id: userId, type: 'GPU_CLUSTER', status: 'APPROVED', total_units: { lte: 0 }, archived_at: null } }),
+      prisma.listing.count({ where: { supplier_id: userId, type: 'GPU_CLUSTER', status: { in: ['SUBMITTED', 'IN_REVIEW', 'REVISION_REQUESTED', 'RESUBMITTED'] }, total_units: { lte: 0 }, archived_at: null } }),
+      prisma.listing.count({ where: { supplier_id: userId, type: 'GPU_CLUSTER', status: 'DRAFT', total_units: { lte: 0 }, archived_at: null } }),
+      prisma.listing.count({ where: { supplier_id: userId, type: 'GPU_CLUSTER', total_units: { gt: 0 }, archived_at: null } }),
+      prisma.listing.count({ where: { supplier_id: userId, type: 'GPU_CLUSTER', status: 'AVAILABLE', total_units: { gt: 0 } } }),
+      prisma.listing.count({ where: { supplier_id: userId, type: 'GPU_CLUSTER', status: 'RESERVED', total_units: { gt: 0 } } }),
+      prisma.listing.count({ where: { supplier_id: userId, type: 'GPU_CLUSTER', status: 'SOLD', total_units: { gt: 0 } } }),
+    ]);
+    res.json({
+      totalDcListings, approvedDcListings, pendingDcListings, draftDcListings, rejectedDcListings,
+      totalGpuListings, approvedGpuListings, pendingGpuListings, draftGpuListings,
+      totalInventory, availableInventory, reservedInventory, soldInventory,
+    });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   getProfile, updateProfile, submitKyc,
   getTeam, inviteTeamMember, revokeTeamMember,
   getBrokerCompanies, addBrokerCompany, updateBrokerCompany,
+  getAnalytics,
 };

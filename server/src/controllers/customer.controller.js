@@ -4,11 +4,33 @@ const { logAction } = require('../services/audit.service');
 // GET /api/customer/profile
 const getProfile = async (req, res, next) => {
   try {
+    if (!req.user.organization_id) return res.status(404).json({ error: 'No organization linked to user' });
     const org = await prisma.organization.findUnique({
       where: { id: req.user.organization_id }
     });
     if (!org) return res.status(404).json({ error: 'Organization not found' });
-    res.json({ ...org, _id: org.id });
+    res.json({
+      ...org,
+      _id: org.id,
+      companyName: org.company_name,
+      companyType: org.company_type,
+      contactEmail: org.contact_email,
+      contactNumber: org.contact_number,
+      industrySector: org.industry_sector,
+      taxVatNumber: org.tax_vat_number,
+      companyAddress: org.company_address,
+      authSignatoryName: org.auth_signatory_name,
+      authSignatoryTitle: org.auth_signatory_title,
+      billingContactName: org.billing_contact_name,
+      billingContactEmail: org.billing_contact_email,
+      primaryUseCases: org.primary_use_cases,
+      locationPreferences: org.location_preferences,
+      sovereigntyReqs: org.sovereignty_reqs,
+      complianceReqs: org.compliance_reqs,
+      budgetRange: org.budget_range,
+      createdAt: org.created_at,
+      updatedAt: org.updated_at,
+    });
   } catch (err) { next(err); }
 };
 
@@ -45,8 +67,48 @@ const updateProfile = async (req, res, next) => {
     });
 
     await logAction({ userId: req.user.userId, action: 'UPDATE_CUSTOMER_PROFILE', targetModel: 'Organization', targetId: updated.id, ipAddress: req.ip });
-    res.json({ ...updated, _id: updated.id });
+    res.json({
+      ...updated,
+      _id: updated.id,
+      companyName: updated.company_name,
+      companyType: updated.company_type,
+      contactEmail: updated.contact_email,
+      industrySector: updated.industry_sector,
+      taxVatNumber: updated.tax_vat_number,
+      companyAddress: updated.company_address,
+      authSignatoryName: updated.auth_signatory_name,
+      authSignatoryTitle: updated.auth_signatory_title,
+      billingContactName: updated.billing_contact_name,
+      billingContactEmail: updated.billing_contact_email,
+      primaryUseCases: updated.primary_use_cases,
+      locationPreferences: updated.location_preferences,
+      sovereigntyReqs: updated.sovereignty_reqs,
+      complianceReqs: updated.compliance_reqs,
+      budgetRange: updated.budget_range,
+    });
   } catch (err) { next(err); }
 };
 
-module.exports = { getProfile, updateProfile };
+// GET /api/customer/analytics
+const getAnalytics = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const [
+      totalGpuDemands, newGpuDemands, closedGpuDemands,
+      totalDcRequests, newDcRequests, closedDcRequests,
+    ] = await Promise.all([
+      prisma.inquiry.count({ where: { user_id: userId, type: 'GPU_DEMAND' } }),
+      prisma.inquiry.count({ where: { user_id: userId, type: 'GPU_DEMAND', status: 'NEW' } }),
+      prisma.inquiry.count({ where: { user_id: userId, type: 'GPU_DEMAND', status: 'CLOSED' } }),
+      prisma.inquiry.count({ where: { user_id: userId, type: 'DC_REQUEST' } }),
+      prisma.inquiry.count({ where: { user_id: userId, type: 'DC_REQUEST', status: 'NEW' } }),
+      prisma.inquiry.count({ where: { user_id: userId, type: 'DC_REQUEST', status: 'CLOSED' } }),
+    ]);
+    res.json({
+      totalGpuDemands, newGpuDemands, closedGpuDemands,
+      totalDcRequests, newDcRequests, closedDcRequests,
+    });
+  } catch (err) { next(err); }
+};
+
+module.exports = { getProfile, updateProfile, getAnalytics };

@@ -105,11 +105,12 @@ const updateApplication = async (req, res, next) => {
     }
 
     const { dataCenterName, ...rest } = req.body;
+    const existingSpecs = (app.specifications && typeof app.specifications === 'object') ? app.specifications : {};
     const updated = await prisma.listing.update({
       where: { id: app.id },
-      data: { 
+      data: {
         data_center_name: dataCenterName || app.data_center_name,
-        specifications: rest,
+        specifications: { ...existingSpecs, ...rest },
         updated_at: new Date()
       }
     });
@@ -234,11 +235,13 @@ const updateSite = async (req, res, next) => {
     if (!site) return res.status(404).json({ error: 'Site not found' });
 
     const { siteName, ...specs } = req.body;
+    // Merge new specs into existing specs so each step save doesn't wipe other steps' data
+    const existingSpecs = (site.specifications && typeof site.specifications === 'object') ? site.specifications : {};
     const updated = await prisma.dcSite.update({
       where: { id: site.id },
       data: {
         site_name: siteName || site.site_name,
-        specifications: specs
+        specifications: { ...existingSpecs, ...specs }
       }
     });
 

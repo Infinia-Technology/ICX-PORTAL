@@ -87,7 +87,7 @@ const autoArchiveInactive = async () => {
     where: {
       archived_at: null,
       updated_at: { lt: threeMonthsAgo },
-      status: 'APPROVED'
+      status: { in: ['APPROVED', 'SUBMITTED', 'IN_REVIEW', 'RESUBMITTED', 'REVISION_REQUESTED'] }
     }
   });
 

@@ -37,8 +37,73 @@ const getQueue = async (req, res, next) => {
 
     const result = await paginatePrisma(prisma.queueItem, where, page, limit, {
       assigned_to: { select: { email: true, role: true } },
-      listing: true
     });
+
+    // Separate items by reference_model
+    const listingIds = result.data
+      .filter(item => item.reference_model === 'Listing')
+      .map(item => item.reference_id);
+    const orgIds = result.data
+      .filter(item => item.reference_model === 'Organization')
+      .map(item => item.reference_id);
+    const inquiryIds = result.data
+      .filter(item => item.reference_model === 'Inquiry')
+      .map(item => item.reference_id);
+
+    let listingsMap = {};
+    if (listingIds.length > 0) {
+      const listings = await prisma.listing.findMany({
+        where: { id: { in: listingIds } },
+        include: {
+          supplier: { select: { email: true, role: true, name: true } },
+          organization: { select: { company_name: true, type: true } }
+        }
+      });
+      listingsMap = Object.fromEntries(listings.map(l => [l.id, l]));
+    }
+
+    let orgsMap = {};
+    if (orgIds.length > 0) {
+      const orgs = await prisma.organization.findMany({
+        where: { id: { in: orgIds } },
+        include: { users: { select: { email: true, role: true }, take: 1 } }
+      });
+      orgsMap = Object.fromEntries(orgs.map(o => [o.id, o]));
+    }
+
+    let inquiriesMap = {};
+    if (inquiryIds.length > 0) {
+      const inquiries = await prisma.inquiry.findMany({
+        where: { id: { in: inquiryIds } },
+        include: {
+          user: { select: { email: true, role: true } },
+          organization: { select: { company_name: true } }
+        }
+      });
+      inquiriesMap = Object.fromEntries(inquiries.map(i => [i.id, i]));
+    }
+
+    result.data = result.data.map(item => {
+      let submitterEmail = '', submitterRole = '', organizationName = '';
+      if (item.reference_model === 'Listing' && listingsMap[item.reference_id]) {
+        const listing = listingsMap[item.reference_id];
+        submitterEmail = listing.supplier?.email || '';
+        submitterRole = listing.supplier?.role || '';
+        organizationName = listing.organization?.company_name || listing.data_center_name || '';
+      } else if (item.reference_model === 'Organization' && orgsMap[item.reference_id]) {
+        const org = orgsMap[item.reference_id];
+        submitterEmail = org.users[0]?.email || '';
+        submitterRole = org.users[0]?.role || '';
+        organizationName = org.company_name || '';
+      } else if (item.reference_model === 'Inquiry' && inquiriesMap[item.reference_id]) {
+        const inquiry = inquiriesMap[item.reference_id];
+        submitterEmail = inquiry.user?.email || '';
+        submitterRole = inquiry.user?.role || '';
+        organizationName = inquiry.organization?.company_name || '';
+      }
+      return { ...item, _id: item.id, createdAt: item.created_at, updatedAt: item.updated_at, submitterEmail, submitterRole, organizationName };
+    });
+
     res.json(result);
   } catch (err) { next(err); }
 };
@@ -280,6 +345,16 @@ const getCustomers = async (req, res, next) => {
     if (status) where.status = status.toUpperCase();
 
     const result = await paginatePrisma(prisma.organization, where, page, limit);
+
+    result.data = result.data.map(org => ({
+      ...org,
+      _id: org.id,
+      companyName: org.company_name,
+      contactEmail: org.contact_email,
+      createdAt: org.created_at,
+      updatedAt: org.updated_at,
+    }));
+
     res.json(result);
   } catch (err) { next(err); }
 };
@@ -294,23 +369,68 @@ const getCustomer = async (req, res, next) => {
       }
     });
     if (!org) return res.status(404).json({ error: 'Customer not found' });
-    res.json(org);
+    res.json({
+      ...org,
+      _id: org.id,
+      companyName: org.company_name,
+      companyType: org.company_type,
+      contactEmail: org.contact_email,
+      contactNumber: org.contact_number,
+      industrySector: org.industry_sector,
+      taxVatNumber: org.tax_vat_number,
+      companyAddress: org.company_address,
+      authSignatoryName: org.auth_signatory_name,
+      authSignatoryTitle: org.auth_signatory_title,
+      billingContactName: org.billing_contact_name,
+      billingContactEmail: org.billing_contact_email,
+      primaryUseCases: org.primary_use_cases,
+      locationPreferences: org.location_preferences,
+      sovereigntyReqs: org.sovereignty_reqs,
+      complianceReqs: org.compliance_reqs,
+      budgetRange: org.budget_range,
+      vendorType: org.vendor_type,
+      mandateStatus: org.mandate_status,
+      createdAt: org.created_at,
+      updatedAt: org.updated_at,
+    });
   } catch (err) { next(err); }
 };
 
 // PUT /api/admin/customers/:id/verify
 const verifyCustomer = async (req, res, next) => {
   try {
-    const { status } = req.body;
+    const { action, status } = req.body;
+    const ACTION_TO_STATUS = {
+      APPROVE: 'APPROVED',
+      REJECT: 'REJECTED',
+      REQUEST_REVISION: 'REVISION_REQUESTED',
+    };
+    const newStatus = action ? (ACTION_TO_STATUS[action] || action) : status?.toUpperCase();
+    if (!newStatus) return res.status(400).json({ error: 'action or status is required' });
     const org = await prisma.organization.update({
       where: { id: req.params.id },
-      data: { status: status.toUpperCase() }
+      data: { status: newStatus }
     });
     res.json(org);
   } catch (err) { next(err); }
 };
 
 // ======================= INQUIRIES (Demands/Requests) =======================
+
+const createAdminGpuDemand = async (req, res, next) => {
+  try {
+    const demand = await prisma.inquiry.create({
+      data: {
+        user_id: req.user.userId,
+        type: 'GPU_DEMAND',
+        status: 'SUBMITTED',
+        specifications: req.body,
+      }
+    });
+    await logAction({ userId: req.user.userId, action: 'ADMIN_CREATE_GPU_DEMAND', targetModel: 'Inquiry', targetId: demand.id, ipAddress: req.ip });
+    res.status(201).json({ ...demand, _id: demand.id });
+  } catch (err) { next(err); }
+};
 
 const getAdminInquiries = (type) => async (req, res, next) => {
   try {
@@ -319,6 +439,16 @@ const getAdminInquiries = (type) => async (req, res, next) => {
     if (status) where.status = status;
 
     const result = await paginatePrisma(prisma.inquiry, where, page, limit, { organization: true });
+
+    result.data = result.data.map(item => ({
+      ...item,
+      ...(item.specifications || {}),
+      _id: item.id,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+      organizationName: item.organization?.company_name || null,
+    }));
+
     res.json(result);
   } catch (err) { next(err); }
 };
@@ -365,28 +495,37 @@ const getAnalytics = async (req, res, next) => {
   try {
     const [
       suppliers, customers,
-      dcListings, gpuClusters,
+      approvedDcListings, pendingDcListings,
+      approvedGpuClusters,
       pendingQueue,
-      totalMw
+      totalMw,
+      totalGpuDemands,
+      totalDcRequests,
     ] = await Promise.all([
       prisma.organization.count({ where: { type: 'SUPPLIER', status: 'APPROVED' } }),
       prisma.organization.count({ where: { type: 'CUSTOMER', status: 'APPROVED' } }),
-      prisma.listing.count({ where: { type: 'DC_SITE', status: 'APPROVED' } }),
-      prisma.listing.count({ where: { type: 'GPU_CLUSTER', status: 'APPROVED' } }),
-      prisma.queueItem.count({ where: { status: { in: ['NEW', 'IN_REVIEW'] } } }),
+      prisma.listing.count({ where: { type: 'DC_SITE', status: 'APPROVED', archived_at: null } }),
+      prisma.listing.count({ where: { type: 'DC_SITE', status: { in: ['SUBMITTED', 'IN_REVIEW', 'RESUBMITTED', 'REVISION_REQUESTED'] }, archived_at: null } }),
+      prisma.listing.count({ where: { type: 'GPU_CLUSTER', status: 'APPROVED', archived_at: null } }),
+      prisma.queueItem.count({ where: { status: { in: ['NEW', 'IN_REVIEW', 'RESUBMITTED'] } } }),
       prisma.listing.aggregate({
         where: { type: 'DC_SITE', status: 'APPROVED' },
         _sum: { total_mw: true }
-      })
+      }),
+      prisma.inquiry.count({ where: { type: 'GPU_DEMAND' } }),
+      prisma.inquiry.count({ where: { type: 'DC_REQUEST' } }),
     ]);
 
     res.json({
       totalSuppliers: suppliers,
       totalCustomers: customers,
-      approvedDcListings: dcListings,
-      approvedGpuClusters: gpuClusters,
+      approvedDcListings,
+      pendingDcListings,
+      approvedGpuClusters,
       pendingQueue,
-      totalApprovedMw: totalMw._sum.total_mw || 0
+      totalApprovedMw: totalMw._sum.total_mw || 0,
+      totalGpuDemands,
+      totalDcRequests,
     });
   } catch (err) { next(err); }
 };
@@ -415,7 +554,7 @@ const createReader = async (req, res, next) => {
     if (existing) return res.status(409).json({ error: 'User already exists' });
 
     const reader = await prisma.user.create({ data: { email, role: 'reader' } });
-    await sendEmail(email, 'Welcome to ICX Portal', 'You have been granted reader access.');
+    await sendEmail(email, 'Welcome to Compute Exchange', 'You have been granted reader access.');
     
     await logAction({ userId: req.user.userId, action: 'CREATE_READER', targetModel: 'User', targetId: reader.id });
     res.status(201).json(reader);
@@ -444,7 +583,7 @@ const resendReaderWelcome = async (req, res, next) => {
   try {
     const reader = await prisma.user.findUnique({ where: { id: req.params.id, role: 'reader' } });
     if (!reader) return res.status(404).json({ error: 'Reader not found' });
-    await sendEmail(reader.email, 'ICX Portal — Access Reminder', 'You have reader access to the portal.');
+    await sendEmail(reader.email, 'Compute Exchange — Access Reminder', 'You have reader access to the portal.');
     res.json({ message: 'Welcome email resent' });
   } catch (err) { next(err); }
 };
@@ -508,6 +647,7 @@ module.exports = {
   getDcListings, getDcListing, reviewDcListing,
   getGpuClusters, getGpuCluster, reviewGpuCluster,
   getCustomers, getCustomer, verifyCustomer,
+  createAdminGpuDemand,
   getAdminGpuDemands: getAdminInquiries('GPU_DEMAND'), getAdminGpuDemand: getAdminInquiry, matchGpuDemand: matchInquiry,
   getAdminDcRequests: getAdminInquiries('DC_REQUEST'), getAdminDcRequest: getAdminInquiry, matchDcRequest: matchInquiry,
   updateDocumentStatus,

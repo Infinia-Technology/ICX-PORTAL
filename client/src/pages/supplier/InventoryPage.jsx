@@ -60,7 +60,11 @@ export default function SupplierInventoryPage() {
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
+  const [confirmModal, setConfirmModal] = useState({ open: false, message: '', onConfirm: null });
   const { addToast } = useToast();
+
+  const openConfirm = (message, onConfirm) => setConfirmModal({ open: true, message, onConfirm });
+  const closeConfirm = () => setConfirmModal({ open: false, message: '', onConfirm: null });
 
   const load = () => {
     Promise.all([
@@ -116,7 +120,7 @@ export default function SupplierInventoryPage() {
       minOrderQuantity: row.minOrderQuantity || '1',
       availabilityStartDate: row.availabilityStartDate ? row.availabilityStartDate.slice(0, 10) : '',
       availabilityEndDate: row.availabilityEndDate ? row.availabilityEndDate.slice(0, 10) : '',
-      location: row.location || '',
+      location: (typeof row.location === 'string' ? row.location : row.country) || '',
       description: row.description || '',
       notes: row.notes || '',
     });
@@ -158,16 +162,16 @@ export default function SupplierInventoryPage() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Delete this inventory item?')) return;
-
-    try {
-      await api.delete(`/inventory/${id}`);
-      addToast({ type: 'success', message: 'Inventory deleted' });
-      load();
-    } catch (err) {
-      addToast({ type: 'error', message: err.response?.data?.error || 'Failed to delete' });
-    }
+  const handleDelete = (id) => {
+    openConfirm('Delete this GPU request?', async () => {
+      try {
+        await api.delete(`/inventory/${id}`);
+        addToast({ type: 'success', message: 'GPU request deleted' });
+        load();
+      } catch (err) {
+        addToast({ type: 'error', message: err.response?.data?.error || 'Failed to delete' });
+      }
+    });
   };
 
   const canEditDelete = (status) => !['RESERVED', 'SOLD'].includes(status);
@@ -289,14 +293,11 @@ export default function SupplierInventoryPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">My Inventory</h1>
-          <p className="text-[var(--color-text-secondary)] text-sm mt-1">
-            Track GPU cluster inventory with unit bookings
-          </p>
+          <h1 className="text-2xl font-bold">GPU Requests</h1>
         </div>
         <Button onClick={openCreate}>
           <PlusCircle className="w-4 h-4 mr-2" />
-          Add Inventory
+          Add GPU Request
         </Button>
       </div>
 
@@ -346,11 +347,20 @@ export default function SupplierInventoryPage() {
           ),
       )}
 
+      {/* Confirm Modal */}
+      <Modal open={confirmModal.open} onClose={closeConfirm} title="Confirm">
+        <p className="text-sm text-[var(--color-text-secondary)] mb-6">{confirmModal.message}</p>
+        <div className="flex justify-end gap-3">
+          <Button variant="secondary" onClick={closeConfirm}>Cancel</Button>
+          <Button variant="danger" onClick={() => { closeConfirm(); confirmModal.onConfirm?.(); }}>Confirm</Button>
+        </div>
+      </Modal>
+
       {/* Create/Edit Modal */}
       <Modal
         open={showModal}
         onClose={() => setShowModal(false)}
-        title={editing ? 'Edit Inventory' : 'Create Inventory'}
+        title={editing ? 'Edit GPU Request' : 'Create GPU Request'}
       >
         <div className="space-y-4">
           <div>
@@ -381,7 +391,7 @@ export default function SupplierInventoryPage() {
                   setForm((p) => ({
                     ...p,
                     gpuClusterListingId: clusterId,
-                    location: selectedCluster?.location || p.location,
+                    location: (typeof selectedCluster?.location === 'string' ? selectedCluster.location : null) || selectedCluster?.country || p.location,
                   }));
                 }}
                 options={clusters

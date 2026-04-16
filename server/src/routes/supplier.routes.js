@@ -6,7 +6,9 @@ const {
   getProfile, updateProfile, submitKyc,
   getTeam, inviteTeamMember, revokeTeamMember,
   getBrokerCompanies, addBrokerCompany, updateBrokerCompany,
+  getAnalytics,
 } = require('../controllers/supplier.controller');
+
 const { getSuppliers } = require('../controllers/admin.controller');
 
 router.use(authenticate);
@@ -25,5 +27,8 @@ router.delete('/team/:id', authorize('supplier', 'broker'), revokeTeamMember);
 router.get('/broker-companies', authorize('broker'), getBrokerCompanies);
 router.post('/broker-companies', authorize('broker'), addBrokerCompany);
 router.put('/broker-companies/:id', authorize('broker'), updateBrokerCompany);
+
+// Analytics
+router.get('/analytics', authorize('supplier', 'broker', 'subordinate'), getAnalytics);
 
 module.exports = router;

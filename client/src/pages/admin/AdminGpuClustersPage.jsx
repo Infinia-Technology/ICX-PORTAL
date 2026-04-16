@@ -76,6 +76,7 @@ export default function AdminGpuClustersPage() {
               ...['DRAFT', 'SUBMITTED', 'IN_REVIEW', 'RESUBMITTED', 'APPROVED', 'REJECTED', 'REVISION_REQUESTED'].map((s) => ({ value: s, label: s.replace(/_/g, ' ') })),
             ]}
           />
+          <Link to="/admin/gpu-clusters/new"><Button variant="primary">+ New GPU Listing</Button></Link>
         </div>
       </div>
       {loading ? <div className="flex justify-center py-20"><Spinner size="lg" /></div> : <DataTable columns={columns} data={clusters} />}

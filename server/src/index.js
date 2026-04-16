@@ -21,6 +21,7 @@ const notificationRoutes = require('./routes/notification.routes');
 const reportRoutes = require('./routes/report.routes');
 const duplicatesRoutes = require('./routes/duplicates.routes');
 const accountRoutes = require('./routes/account.routes');
+const inviteRoutes = require('./routes/invite.routes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -61,6 +62,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/duplicates', duplicatesRoutes);
 app.use('/api/account', accountRoutes);
+app.use('/api/invites', inviteRoutes);
 
 // Error handler (must be last)
 app.use(errorHandler);
@@ -69,7 +71,7 @@ app.use(errorHandler);
 require('./cron');
 
 app.listen(PORT, () => {
-  console.log(`ICX Portal server running on port ${PORT}`);
+  console.log(`Compute Exchange server running on port ${PORT}`);
 });
 
 module.exports = app;

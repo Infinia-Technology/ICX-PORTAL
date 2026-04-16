@@ -11,14 +11,14 @@ const {
 
 router.use(authenticate);
 
-router.get('/', authorize('supplier', 'broker'), listClusters);
-router.post('/', authorize('supplier', 'broker'), createCluster);
-router.get('/:id', authorize('supplier', 'broker', 'subordinate'), getCluster);
-router.put('/:id', authorize('supplier', 'broker', 'subordinate'), updateCluster);
-router.post('/:id/submit', authorize('supplier', 'broker'), submitCluster);
-router.post('/:id/resubmit', authorize('supplier', 'broker'), resubmitCluster);
-router.post('/:id/documents', authorize('supplier', 'broker', 'subordinate'), upload.single('file'), uploadDocument);
-router.delete('/:id/documents/:docId', authorize('supplier', 'broker'), deleteDocument);
-router.post('/:id/refresh', authorize('supplier', 'broker'), refreshCluster);
+router.get('/', authorize('supplier', 'broker', 'admin', 'superadmin'), listClusters);
+router.post('/', authorize('supplier', 'broker', 'subordinate', 'admin', 'superadmin'), createCluster);
+router.get('/:id', authorize('supplier', 'broker', 'subordinate', 'admin', 'superadmin'), getCluster);
+router.put('/:id', authorize('supplier', 'broker', 'subordinate', 'admin', 'superadmin'), updateCluster);
+router.post('/:id/submit', authorize('supplier', 'broker', 'admin', 'superadmin'), submitCluster);
+router.post('/:id/resubmit', authorize('supplier', 'broker', 'admin', 'superadmin'), resubmitCluster);
+router.post('/:id/documents', authorize('supplier', 'broker', 'subordinate', 'admin', 'superadmin'), upload.single('file'), uploadDocument);
+router.delete('/:id/documents/:docId', authorize('supplier', 'broker', 'admin', 'superadmin'), deleteDocument);
+router.post('/:id/refresh', authorize('supplier', 'broker', 'admin', 'superadmin'), refreshCluster);
 
 module.exports = router;

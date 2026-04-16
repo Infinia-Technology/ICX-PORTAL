@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Building2, Server, Shield, ArrowRight, Globe, Zap, Lock, Users, BarChart3, CheckCircle } from 'lucide-react';
+import { Building2, Server, Shield, ArrowRight, Zap, Lock, BarChart3, CheckCircle } from 'lucide-react';
 import Button from '../../components/ui/Button';
 
 export default function LandingPage() {
@@ -14,22 +14,12 @@ export default function LandingPage() {
         </div>
 
         <div className="max-w-5xl mx-auto text-center relative">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 text-[var(--color-primary)] text-sm font-medium mb-6">
-            <Globe className="w-4 h-4" />
-            Global Infrastructure Exchange
-          </div>
-
           <h1 className="text-4xl sm:text-6xl font-extrabold leading-tight tracking-tight">
-            <span className="text-[var(--color-text)]">The Private Marketplace for</span>
-            <br />
-            <span className="bg-gradient-to-r from-[var(--color-primary)] to-indigo-500 bg-clip-text text-transparent">
-              Data Center & GPU Infrastructure
-            </span>
+            <span className="text-[var(--color-text)]">Infrastructure Capacity Registry</span>
           </h1>
 
           <p className="mt-6 text-lg sm:text-xl text-[var(--color-text-secondary)] max-w-3xl mx-auto leading-relaxed">
-            ICX connects verified infrastructure providers with enterprise buyers.
-            List capacity, discover supply, and match demand — all in one secure, admin-verified platform.
+            Submit available capacity or sourcing requirements. Our team handles the rest.
           </p>
 
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
@@ -45,9 +35,6 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          <p className="mt-4 text-xs text-[var(--color-text-muted)]">
-            No credit card required. Get started in under 2 minutes.
-          </p>
         </div>
       </section>
 
@@ -57,7 +44,6 @@ export default function LandingPage() {
           <span className="flex items-center gap-1.5"><Lock className="w-4 h-4" /> End-to-End Encrypted</span>
           <span className="hidden sm:flex items-center gap-1.5"><Shield className="w-4 h-4" /> Admin-Verified Suppliers</span>
           <span className="flex items-center gap-1.5"><CheckCircle className="w-4 h-4" /> OTP Authentication</span>
-          <span className="hidden sm:flex items-center gap-1.5"><Users className="w-4 h-4" /> Role-Based Access</span>
         </div>
       </section>
 
@@ -195,7 +181,10 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="py-8 px-4 border-t border-[var(--color-border)]">
         <div className="max-w-5xl mx-auto flex items-center justify-between text-sm text-[var(--color-text-muted)]">
-          <p className="font-semibold text-[var(--color-text)]">ICX Portal</p>
+          <div className="flex flex-col items-start gap-0.5">
+            <img src="/logo.svg" alt="Infinia" className="h-5 w-auto" />
+            <span className="text-[11px] font-medium tracking-wide text-[var(--color-text-secondary)] leading-none">Compute Exchange</span>
+          </div>
           <div className="flex gap-6">
             <Link to="/terms" className="hover:text-[var(--color-text)]">Terms</Link>
             <Link to="/privacy" className="hover:text-[var(--color-text)]">Privacy</Link>

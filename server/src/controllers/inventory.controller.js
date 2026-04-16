@@ -53,6 +53,8 @@ const listInventory = async (req, res, next) => {
     result.data = result.data.map(item => ({
       ...item,
       _id: item.id,
+      name: item.data_center_name || '—',
+      location: item.country || item.city || null,
       totalUnits: item.total_units,
       bookedUnits: item.booked_units,
       availableUnits: item.available_units,
@@ -72,13 +74,20 @@ const createInventory = async (req, res, next) => {
   try {
     const schema = z.object({
       name: z.string().min(1, 'Name is required').optional(),
-      data_center_name: z.string().optional(),
       country: z.string().optional(),
       city: z.string().optional(),
       totalUnits: z.number().min(1, 'Total units must be at least 1'),
       pricePerUnit: z.number().min(0).optional(),
       currency: z.string().optional(),
-      contract_duration: z.string().optional(),
+      pricingPeriod: z.string().optional(),
+      unitType: z.string().optional(),
+      minOrderQuantity: z.number().min(1).optional(),
+      gpuClusterListingId: z.string().optional(),
+      availabilityStartDate: z.string().optional(),
+      availabilityEndDate: z.string().optional(),
+      location: z.string().optional(),
+      description: z.string().optional(),
+      notes: z.string().optional(),
     });
 
     const validated = schema.parse(req.body);
@@ -86,18 +95,26 @@ const createInventory = async (req, res, next) => {
     const listing = await prisma.listing.create({
       data: {
         supplier_id: req.user.userId,
-        name: validated.name,
-        data_center_name: validated.data_center_name,
-        country: validated.country,
-        city: validated.city,
+        data_center_name: validated.name || null,
+        country: validated.country || validated.location || null,
+        city: validated.city || null,
         total_units: validated.totalUnits,
         booked_units: 0,
         available_units: validated.totalUnits,
-        price: validated.pricePerUnit,
+        price: validated.pricePerUnit || null,
         currency: validated.currency || 'USD',
         status: 'AVAILABLE',
-        contract_duration: validated.contract_duration,
-        type: 'GPU_CLUSTER' // Default for inventory page context
+        contract_duration: validated.pricingPeriod || null,
+        type: 'GPU_CLUSTER',
+        specifications: {
+          unitType: validated.unitType || null,
+          minOrderQuantity: validated.minOrderQuantity || null,
+          gpuClusterListingId: validated.gpuClusterListingId || null,
+          availabilityStartDate: validated.availabilityStartDate || null,
+          availabilityEndDate: validated.availabilityEndDate || null,
+          description: validated.description || null,
+          notes: validated.notes || null,
+        },
       },
       include: { supplier: { select: { name: true, email: true } } }
     });
@@ -138,6 +155,8 @@ const getInventory = async (req, res, next) => {
     const formatted = {
       ...listing,
       _id: listing.id,
+      name: listing.data_center_name || '—',
+      location: listing.country || listing.city || null,
       totalUnits: listing.total_units,
       bookedUnits: listing.booked_units,
       availableUnits: listing.available_units,
@@ -169,17 +188,31 @@ const updateInventory = async (req, res, next) => {
 
     const schema = z.object({
       name: z.string().min(1).optional(),
-      data_center_name: z.string().optional(),
       totalUnits: z.number().min(1).optional(),
       pricePerUnit: z.number().min(0).optional(),
+      pricingPeriod: z.string().optional(),
       currency: z.string().optional(),
+      unitType: z.string().optional(),
+      location: z.string().optional(),
+      description: z.string().optional(),
+      notes: z.string().optional(),
     });
 
     const validated = schema.parse(req.body);
 
     const updateData = {};
-    if (validated.name !== undefined) updateData.name = validated.name;
-    if (validated.data_center_name !== undefined) updateData.data_center_name = validated.data_center_name;
+    if (validated.name !== undefined) updateData.data_center_name = validated.name;
+    if (validated.location !== undefined) updateData.country = validated.location;
+    if (validated.pricingPeriod !== undefined) updateData.contract_duration = validated.pricingPeriod;
+    // Merge spec updates into existing specs
+    const specsToUpdate = {};
+    if (validated.unitType !== undefined) specsToUpdate.unitType = validated.unitType;
+    if (validated.description !== undefined) specsToUpdate.description = validated.description;
+    if (validated.notes !== undefined) specsToUpdate.notes = validated.notes;
+    if (Object.keys(specsToUpdate).length > 0) {
+      const existingSpecs = (listing.specifications && typeof listing.specifications === 'object') ? listing.specifications : {};
+      updateData.specifications = { ...existingSpecs, ...specsToUpdate };
+    }
     if (validated.pricePerUnit !== undefined) updateData.price = validated.pricePerUnit;
     if (validated.currency !== undefined) updateData.currency = validated.currency;
 
@@ -227,10 +260,11 @@ const updateInventoryStatus = async (req, res, next) => {
 
     // Validate transitions
     const allowedTransitions = {
+      APPROVED:  ['AVAILABLE', 'RESERVED', 'ARCHIVED'],
       AVAILABLE: ['RESERVED', 'ARCHIVED'],
-      RESERVED: ['SOLD', 'AVAILABLE'],
-      SOLD: ['ARCHIVED'],
-      ARCHIVED: [],
+      RESERVED:  ['SOLD', 'AVAILABLE', 'ARCHIVED'],
+      SOLD:      ['ARCHIVED'],
+      ARCHIVED:  [],
     };
 
     if (!allowedTransitions[listing.status]?.includes(status)) {
@@ -276,8 +310,8 @@ const deleteInventory = async (req, res, next) => {
       return res.status(400).json({ error: `Cannot delete inventory with status ${listing.status}.` });
     }
 
-    // Prisma handles cascading dynamically if set, but we manually delete reservations first
     await prisma.reservation.deleteMany({ where: { listing_id: listing.id } });
+    await prisma.queueItem.deleteMany({ where: { reference_id: listing.id } });
     await prisma.listing.delete({ where: { id: listing.id } });
 
     // Audit

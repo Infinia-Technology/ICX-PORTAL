@@ -8,6 +8,7 @@ const {
   getDcListings, getDcListing, reviewDcListing,
   getGpuClusters, getGpuCluster, reviewGpuCluster,
   getCustomers, getCustomer, verifyCustomer,
+  createAdminGpuDemand,
   getAdminGpuDemands, getAdminGpuDemand, matchGpuDemand,
   getAdminDcRequests, getAdminDcRequest, matchDcRequest,
   updateDocumentStatus,
@@ -43,6 +44,7 @@ router.get('/customers/:id', getCustomer);
 router.put('/customers/:id/verify', verifyCustomer);
 
 // Demands & Matching
+router.post('/gpu-demands', createAdminGpuDemand);
 router.get('/gpu-demands', getAdminGpuDemands);
 router.get('/gpu-demands/:id', getAdminGpuDemand);
 router.put('/gpu-demands/:id/match', matchGpuDemand);

@@ -75,7 +75,11 @@ export default function InventoryPage() {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [statusItem, setStatusItem] = useState(null);
   const [newStatus, setNewStatus] = useState('');
+  const [confirmModal, setConfirmModal] = useState({ open: false, message: '', onConfirm: null });
   const { addToast } = useToast();
+
+  const openConfirm = (message, onConfirm) => setConfirmModal({ open: true, message, onConfirm });
+  const closeConfirm = () => setConfirmModal({ open: false, message: '', onConfirm: null });
 
   const load = () => {
     Promise.all([
@@ -133,7 +137,7 @@ export default function InventoryPage() {
       minOrderQuantity: row.minOrderQuantity || '1',
       availabilityStartDate: row.availabilityStartDate ? row.availabilityStartDate.slice(0, 10) : '',
       availabilityEndDate: row.availabilityEndDate ? row.availabilityEndDate.slice(0, 10) : '',
-      location: row.location || '',
+      location: (typeof row.location === 'string' ? row.location : row.country) || '',
       description: row.description || '',
       notes: row.notes || '',
     });
@@ -172,11 +176,11 @@ export default function InventoryPage() {
 
       if (editing) {
         await api.put(`/inventory/${editing._id}`, payload);
-        addToast({ type: 'success', message: 'Inventory updated' });
+        addToast({ type: 'success', message: 'GPU request updated' });
       } else {
         payload.gpuClusterListingId = form.gpuClusterListingId;
         await api.post('/inventory', payload);
-        addToast({ type: 'success', message: 'Inventory created' });
+        addToast({ type: 'success', message: 'GPU request created' });
       }
       setShowModal(false);
       load();
@@ -224,29 +228,29 @@ export default function InventoryPage() {
     }
   };
 
-  const handleCancelReservation = async (inventoryId, reservationId) => {
-    if (!confirm('Cancel this reservation?')) return;
-
-    try {
-      await api.put(`/inventory/${inventoryId}/reservations/${reservationId}/cancel`);
-      addToast({ type: 'success', message: 'Reservation cancelled' });
-      load();
-      loadReservations(inventoryId);
-    } catch (err) {
-      addToast({ type: 'error', message: 'Failed to cancel reservation' });
-    }
+  const handleCancelReservation = (inventoryId, reservationId) => {
+    openConfirm('Cancel this reservation?', async () => {
+      try {
+        await api.put(`/inventory/${inventoryId}/reservations/${reservationId}/cancel`);
+        addToast({ type: 'success', message: 'Reservation cancelled' });
+        load();
+        loadReservations(inventoryId);
+      } catch (err) {
+        addToast({ type: 'error', message: 'Failed to cancel reservation' });
+      }
+    });
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Delete this inventory item?')) return;
-
-    try {
-      await api.delete(`/inventory/${id}`);
-      addToast({ type: 'success', message: 'Inventory deleted' });
-      load();
-    } catch (err) {
-      addToast({ type: 'error', message: err.response?.data?.error || 'Failed to delete' });
-    }
+  const handleDelete = (id) => {
+    openConfirm('Delete this GPU request?', async () => {
+      try {
+        await api.delete(`/inventory/${id}`);
+        addToast({ type: 'success', message: 'GPU request deleted' });
+        load();
+      } catch (err) {
+        addToast({ type: 'error', message: err.response?.data?.error || 'Failed to delete' });
+      }
+    });
   };
 
   const canEditDelete = (status) => !['RESERVED', 'SOLD'].includes(status);
@@ -376,14 +380,11 @@ export default function InventoryPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Inventory Management</h1>
-          <p className="text-[var(--color-text-secondary)] text-sm mt-1">
-            Track and manage GPU cluster inventory with unit reservations
-          </p>
+          <h1 className="text-2xl font-bold">GPU Requests</h1>
         </div>
         <Button onClick={openCreate}>
           <PlusCircle className="w-4 h-4 mr-2" />
-          Add Inventory
+          Add GPU Request
         </Button>
       </div>
 
@@ -480,7 +481,7 @@ export default function InventoryPage() {
                 setForm((p) => ({
                   ...p,
                   gpuClusterListingId: clusterId,
-                  location: selectedCluster?.location || p.location,
+                  location: (typeof selectedCluster?.location === 'string' ? selectedCluster.location : null) || selectedCluster?.country || p.location,
                 }));
               }}
               options={clusters
@@ -622,6 +623,19 @@ export default function InventoryPage() {
               Update Status
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Confirm Modal */}
+      <Modal
+        open={confirmModal.open}
+        onClose={closeConfirm}
+        title="Confirm"
+      >
+        <p className="text-sm text-[var(--color-text-secondary)] mb-6">{confirmModal.message}</p>
+        <div className="flex justify-end gap-3">
+          <Button variant="secondary" onClick={closeConfirm}>Cancel</Button>
+          <Button variant="danger" onClick={() => { closeConfirm(); confirmModal.onConfirm?.(); }}>Confirm</Button>
         </div>
       </Modal>
 

@@ -36,10 +36,16 @@ const listRequests = async (req, res, next) => {
     if (status) where.status = status;
 
     const result = await paginatePrisma(prisma.inquiry, where, page, limit);
-    
-    // Map to frontend expectation
-    result.data = result.data.map(d => ({ ...d, _id: d.id, organizationId: d.organization_id, submittedBy: d.user_id }));
-    
+
+    result.data = result.data.map(d => ({
+      ...d,
+      ...(d.specifications || {}),
+      _id: d.id,
+      createdAt: d.created_at,
+      updatedAt: d.updated_at,
+      organizationId: d.organization_id,
+    }));
+
     res.json(result);
   } catch (err) { next(err); }
 };
@@ -53,7 +59,7 @@ const createRequest = async (req, res, next) => {
         user_id: req.user.userId,
         type: 'DC_REQUEST',
         status: 'DRAFT',
-        details: req.body
+        specifications: req.body
       }
     });
 
@@ -95,7 +101,7 @@ const updateRequest = async (req, res, next) => {
 
     const updated = await prisma.inquiry.update({
       where: { id: request.id },
-      data: { details: req.body }
+      data: { specifications: req.body }
     });
     res.json({ ...updated, _id: updated.id });
   } catch (err) { next(err); }
@@ -122,7 +128,7 @@ const submitRequest = async (req, res, next) => {
       data: { status: 'SUBMITTED' }
     });
 
-    await createQueueItem({ type: 'DC_REQUEST', referenceId: request.id, referenceModel: 'Inquiry' });
+    try { await createQueueItem({ type: 'DC_REQUEST', referenceId: request.id, referenceModel: 'Inquiry' }); } catch (qErr) { console.warn('[QUEUE] DC_REQUEST queue item skipped:', qErr.message); }
     await logAction({ userId: req.user.userId, action: 'SUBMIT_DC_REQUEST', targetModel: 'Inquiry', targetId: request.id, ipAddress: req.ip });
     res.json({ message: 'DC request submitted', status: updated.status });
   } catch (err) { next(err); }

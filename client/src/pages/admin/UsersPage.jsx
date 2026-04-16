@@ -20,7 +20,11 @@ export default function UsersPage() {
   const [showModal, setShowModal] = useState(false);
   const [newUser, setNewUser] = useState({ email: '', role: 'reader' });
   const [creating, setCreating] = useState(false);
+  const [confirmModal, setConfirmModal] = useState({ open: false, message: '', onConfirm: null });
   const { addToast } = useToast();
+
+  const openConfirm = (message, onConfirm) => setConfirmModal({ open: true, message, onConfirm });
+  const closeConfirm = () => setConfirmModal({ open: false, message: '', onConfirm: null });
 
   const load = () => {
     api.get('/superadmin/users').then((r) => setUsers(r.data.data || r.data)).catch(console.error).finally(() => setLoading(false));
@@ -53,15 +57,16 @@ export default function UsersPage() {
     }
   };
 
-  const deleteUser = async (id) => {
-    if (!confirm('Permanently delete this user?')) return;
-    try {
-      await api.delete(`/superadmin/users/${id}`);
-      addToast({ type: 'success', message: 'User deleted' });
-      load();
-    } catch (err) {
-      addToast({ type: 'error', message: err.response?.data?.error || 'Failed to delete user' });
-    }
+  const deleteUser = (id) => {
+    openConfirm('Permanently delete this user?', async () => {
+      try {
+        await api.delete(`/superadmin/users/${id}`);
+        addToast({ type: 'success', message: 'User deleted' });
+        load();
+      } catch (err) {
+        addToast({ type: 'error', message: err.response?.data?.error || 'Failed to delete user' });
+      }
+    });
   };
 
   const columns = [
@@ -93,6 +98,14 @@ export default function UsersPage() {
       </div>
 
       <DataTable columns={columns} data={users} />
+
+      <Modal open={confirmModal.open} onClose={closeConfirm} title="Confirm">
+        <p className="text-sm text-[var(--color-text-secondary)] mb-6">{confirmModal.message}</p>
+        <div className="flex justify-end gap-3">
+          <Button variant="secondary" onClick={closeConfirm}>Cancel</Button>
+          <Button variant="danger" onClick={() => { closeConfirm(); confirmModal.onConfirm?.(); }}>Confirm</Button>
+        </div>
+      </Modal>
 
       <Modal open={showModal} onClose={() => setShowModal(false)} title="Create User">
         <div className="space-y-4">

@@ -23,9 +23,6 @@ export default function SupplierRegisterPage() {
   const [form, setForm] = useState({
     vendorType: '',
     mandateStatus: '',
-    ndaRequired: false,
-    ndaSigned: false,
-    contactEmail: '',
     contactNumber: '',
   });
   const [errors, setErrors] = useState({});
@@ -42,7 +39,6 @@ export default function SupplierRegisterPage() {
       return;
     }
     setEmail(data.email);
-    setForm((f) => ({ ...f, contactEmail: data.email }));
     setStep('form');
   };
 
@@ -50,7 +46,7 @@ export default function SupplierRegisterPage() {
     const errs = {};
     if (!form.vendorType) errs.vendorType = 'Required';
     if (!form.mandateStatus) errs.mandateStatus = 'Required';
-    if (!form.contactEmail) errs.contactEmail = 'Required';
+    if (!form.contactNumber) errs.contactNumber = 'Required';
     return errs;
   };
 
@@ -131,40 +127,12 @@ export default function SupplierRegisterPage() {
             required
           />
 
-          <div className="flex gap-6">
-            <label className="inline-flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={form.ndaRequired}
-                onChange={(e) => updateField('ndaRequired', e.target.checked)}
-                className="w-4 h-4 rounded"
-              />
-              NDA Required
-            </label>
-            <label className="inline-flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={form.ndaSigned}
-                onChange={(e) => updateField('ndaSigned', e.target.checked)}
-                className="w-4 h-4 rounded"
-              />
-              NDA Signed
-            </label>
-          </div>
-
-          <Input
-            label="Contact Email"
-            type="email"
-            value={form.contactEmail}
-            onChange={(e) => updateField('contactEmail', e.target.value)}
-            error={errors.contactEmail}
-            required
-          />
           <PhoneInput
-            label="Contact Number"
+            label="Contact Number *"
             value={form.contactNumber}
             onChange={(e) => updateField('contactNumber', e.target.value)}
             name="contactNumber"
+            error={errors.contactNumber}
           />
 
           {errors.submit && (

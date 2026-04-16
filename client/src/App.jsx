@@ -15,6 +15,7 @@ import TermsPage from './pages/public/TermsPage';
 import PrivacyPage from './pages/public/PrivacyPage';
 import NotFoundPage from './pages/public/NotFoundPage';
 import ErrorPage from './pages/public/ErrorPage';
+import InviteAcceptPage from './pages/public/InviteAcceptPage';
 
 // Supplier pages
 import SupplierDashboard from './pages/supplier/SupplierDashboard';
@@ -31,6 +32,7 @@ import TeamPage from './pages/supplier/TeamPage';
 import SupplierGpuDemandNewPage from './pages/supplier/GpuDemandNewPage';
 import SupplierDcRequestNewPage from './pages/supplier/DcRequestNewPage';
 import SupplierSettingsPage from './pages/supplier/SupplierSettingsPage';
+import KycWaitingPage from './pages/supplier/KycWaitingPage';
 
 // Customer pages
 import CustomerDashboard from './pages/customer/CustomerDashboard';
@@ -63,6 +65,7 @@ import AuditLogPage from './pages/admin/AuditLogPage';
 import UsersPage from './pages/admin/UsersPage';
 import AdminSettingsPage from './pages/admin/AdminSettingsPage';
 import ReportsPage from './pages/admin/ReportsPage';
+import AdminArchivePage from './pages/admin/AdminArchivePage';
 
 // Reader pages
 import ReaderMarketplacePage from './pages/reader/ReaderMarketplacePage';
@@ -82,6 +85,7 @@ export default function App() {
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/error" element={<ErrorPage />} />
+              <Route path="/invite/:token" element={<InviteAcceptPage />} />
             </Route>
 
             {/* Supplier / Broker routes */}
@@ -104,6 +108,7 @@ export default function App() {
               <Route path="/supplier/gpu-demands/new" element={<SupplierGpuDemandNewPage />} />
               <Route path="/supplier/dc-requests/new" element={<SupplierDcRequestNewPage />} />
               <Route path="/supplier/settings" element={<SupplierSettingsPage />} />
+              <Route path="/supplier/kyc-waiting" element={<KycWaitingPage />} />
             </Route>
 
             {/* Customer routes */}
@@ -135,8 +140,10 @@ export default function App() {
               <Route path="/admin/customers" element={<CustomersPage />} />
               <Route path="/admin/customers/:id" element={<CustomerDetailPage />} />
               <Route path="/admin/dc-listings" element={<AdminDcListingsPage />} />
+              <Route path="/admin/dc-listings/new" element={<DcListingNewPage />} />
               <Route path="/admin/dc-listings/:id" element={<DcListingReviewPage />} />
               <Route path="/admin/gpu-clusters" element={<AdminGpuClustersPage />} />
+              <Route path="/admin/gpu-clusters/new" element={<GpuClusterNewPage />} />
               <Route path="/admin/gpu-clusters/:id" element={<GpuClusterReviewPage />} />
               <Route path="/admin/inventory" element={<AdminInventoryPage />} />
               <Route path="/admin/gpu-demands" element={<AdminGpuDemandsPage />} />
@@ -147,6 +154,7 @@ export default function App() {
               <Route path="/admin/audit-log" element={<AuditLogPage />} />
               <Route path="/admin/users" element={<UsersPage />} />
               <Route path="/admin/reports" element={<ReportsPage />} />
+              <Route path="/admin/archives" element={<AdminArchivePage />} />
               <Route path="/admin/settings" element={<AdminSettingsPage />} />
             </Route>
 

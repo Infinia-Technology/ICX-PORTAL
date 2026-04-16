@@ -6,4 +6,6 @@ RUN npm install
 COPY . .
 RUN npx prisma generate
 EXPOSE 5000
-CMD ["node", "src/index.js"]
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+CMD ["/entrypoint.sh"]

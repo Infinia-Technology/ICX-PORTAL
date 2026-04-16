@@ -93,8 +93,42 @@ const deleteUser = async (req, res, next) => {
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
 
-    await prisma.user.delete({ where: { id: req.params.id } });
-    await logAction({ userId: req.user.userId, action: 'DELETE_USER', changes: { userId: req.params.id }, ipAddress: req.ip });
+    const userId = req.params.id;
+
+    await prisma.$transaction(async (tx) => {
+      // Disconnect user from QueueItem many-to-many (assigned admins)
+      await tx.user.update({
+        where: { id: userId },
+        data: { assigned_queue: { set: [] } }
+      });
+
+      // Delete direct FK dependents (non-nullable)
+      await tx.notification.deleteMany({ where: { user_id: userId } });
+      await tx.reportTemplate.deleteMany({ where: { user_id: userId } });
+      await tx.inquiry.deleteMany({ where: { user_id: userId } });
+      await tx.reservation.deleteMany({ where: { customer_id: userId } });
+      await tx.teamInvite.deleteMany({ where: { inviter_id: userId } });
+
+      // Nullify nullable FK references
+      await tx.auditLog.updateMany({ where: { user_id: userId }, data: { user_id: null } });
+      await tx.archive.updateMany({ where: { archived_by: userId }, data: { archived_by: null } });
+      await tx.archive.updateMany({ where: { restored_by: userId }, data: { restored_by: null } });
+
+      // Delete user's listings and their dependents
+      const listings = await tx.listing.findMany({ where: { supplier_id: userId }, select: { id: true } });
+      const listingIds = listings.map(l => l.id);
+
+      if (listingIds.length > 0) {
+        await tx.queueItem.deleteMany({ where: { reference_id: { in: listingIds } } });
+        // DcSite → DcDocument, DcPhasingSchedule cascade; ListingDocument cascades
+        await tx.listing.deleteMany({ where: { id: { in: listingIds } } });
+      }
+
+      // Finally delete the user
+      await tx.user.delete({ where: { id: userId } });
+    });
+
+    await logAction({ userId: req.user.userId, action: 'DELETE_USER', changes: { userId }, ipAddress: req.ip });
     res.json({ message: 'User deleted' });
   } catch (err) { next(err); }
 };

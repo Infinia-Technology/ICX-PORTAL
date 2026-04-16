@@ -15,21 +15,24 @@ const {
 router.use(authenticate);
 
 // DC Applications
-router.get('/', authorize('supplier', 'broker', 'subordinate'), listApplications);
-router.post('/', authorize('supplier', 'broker'), createApplication);
-router.get('/:id', authorize('supplier', 'broker', 'subordinate'), getApplication);
-router.put('/:id', authorize('supplier', 'broker'), updateApplication);
-router.post('/:id/submit', authorize('supplier', 'broker'), submitApplication);
-router.post('/:id/resubmit', authorize('supplier', 'broker'), resubmitApplication);
-router.post('/:id/refresh', authorize('supplier', 'broker'), refreshApplication);
+router.get('/', authorize('supplier', 'broker', 'subordinate', 'admin', 'superadmin'), listApplications);
+router.post('/', authorize('supplier', 'broker', 'admin', 'superadmin'), createApplication);
+router.get('/:id', authorize('supplier', 'broker', 'subordinate', 'admin', 'superadmin'), getApplication);
+router.put('/:id', authorize('supplier', 'broker', 'admin', 'superadmin'), updateApplication);
+router.post('/:id/submit', authorize('supplier', 'broker', 'admin', 'superadmin'), submitApplication);
+router.post('/:id/resubmit', authorize('supplier', 'broker', 'admin', 'superadmin'), resubmitApplication);
+router.post('/:id/refresh', authorize('supplier', 'broker', 'admin', 'superadmin'), refreshApplication);
 
 // Sites
-router.post('/:id/sites', authorize('supplier', 'broker', 'subordinate'), addSite);
-router.get('/:id/sites/:siteId', authorize('supplier', 'broker', 'subordinate'), getSite);
-router.put('/:id/sites/:siteId', authorize('supplier', 'broker', 'subordinate'), updateSite);
-router.delete('/:id/sites/:siteId', authorize('supplier', 'broker'), deleteSite);
+router.post('/:id/sites', authorize('supplier', 'broker', 'subordinate', 'admin', 'superadmin'), addSite);
+router.get('/:id/sites/:siteId', authorize('supplier', 'broker', 'subordinate', 'admin', 'superadmin'), getSite);
+router.put('/:id/sites/:siteId', authorize('supplier', 'broker', 'subordinate', 'admin', 'superadmin'), updateSite);
+router.delete('/:id/sites/:siteId', authorize('supplier', 'broker', 'admin', 'superadmin'), deleteSite);
 
-router.post('/:id/sites/:siteId/documents', authorize('supplier', 'broker', 'subordinate'), upload.single('file'), uploadDocument);
-router.delete('/:id/sites/:siteId/documents/:docId', authorize('supplier', 'broker'), deleteDocument);
+router.get('/:id/sites/:siteId/phasing', authorize('supplier', 'broker', 'subordinate', 'admin', 'superadmin'), getPhasing);
+router.put('/:id/sites/:siteId/phasing', authorize('supplier', 'broker', 'subordinate', 'admin', 'superadmin'), updatePhasing);
+
+router.post('/:id/sites/:siteId/documents', authorize('supplier', 'broker', 'subordinate', 'admin', 'superadmin'), upload.single('file'), uploadDocument);
+router.delete('/:id/sites/:siteId/documents/:docId', authorize('supplier', 'broker', 'admin', 'superadmin'), deleteDocument);
 
 module.exports = router;

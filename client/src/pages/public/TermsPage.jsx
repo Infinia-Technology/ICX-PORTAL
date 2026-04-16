@@ -5,7 +5,7 @@ export default function TermsPage() {
       <div className="prose prose-sm text-[var(--color-text-secondary)] space-y-4">
         <p>Last updated: April 2026</p>
         <h2 className="text-lg font-semibold text-[var(--color-text)] mt-6">1. Acceptance of Terms</h2>
-        <p>By accessing and using the ICX Portal (Infinia Compute Exchange), you agree to be bound by these Terms of Service.</p>
+        <p>By accessing and using the Compute Exchange platform, you agree to be bound by these Terms of Service.</p>
         <h2 className="text-lg font-semibold text-[var(--color-text)] mt-6">2. Use of Service</h2>
         <p>ICX is a private B2B marketplace for data center infrastructure. Access is restricted to verified users only.</p>
         <h2 className="text-lg font-semibold text-[var(--color-text)] mt-6">3. User Accounts</h2>

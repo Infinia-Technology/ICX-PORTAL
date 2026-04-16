@@ -15,9 +15,9 @@ const sendEmail = async (to, subject, html) => {
 };
 
 const sendOtpEmail = async (to, code) => {
-  await sendEmail(to, 'ICX Portal — Your Verification Code', `
+  await sendEmail(to, 'Compute Exchange — Your Verification Code', `
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
-      <h2 style="color: #1a1a2e;">ICX Portal</h2>
+      <h2 style="color: #1a1a2e;">Compute Exchange</h2>
       <p>Your verification code is:</p>
       <div style="font-size: 32px; font-weight: bold; letter-spacing: 8px; text-align: center; padding: 24px; background: #f4f4f8; border-radius: 8px; margin: 24px 0;">
         ${code}
@@ -28,9 +28,9 @@ const sendOtpEmail = async (to, code) => {
 };
 
 const sendRegistrationConfirmation = async (to, role) => {
-  await sendEmail(to, 'ICX Portal — Registration Received', `
+  await sendEmail(to, 'Compute Exchange — Registration Received', `
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
-      <h2 style="color: #1a1a2e;">ICX Portal</h2>
+      <h2 style="color: #1a1a2e;">Compute Exchange</h2>
       <p>Thank you for registering as a <strong>${role}</strong>.</p>
       <p>Your application is under review. You will receive an email once your account has been verified.</p>
     </div>
@@ -38,9 +38,9 @@ const sendRegistrationConfirmation = async (to, role) => {
 };
 
 const sendKycApproved = async (to) => {
-  await sendEmail(to, 'ICX Portal — Account Approved', `
+  await sendEmail(to, 'Compute Exchange — Account Approved', `
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
-      <h2 style="color: #1a1a2e;">ICX Portal</h2>
+      <h2 style="color: #1a1a2e;">Compute Exchange</h2>
       <p>Your account has been <strong>approved</strong>. You can now log in and start using the platform.</p>
       <a href="${process.env.CLIENT_URL}/login" style="display: inline-block; padding: 12px 24px; background: #1a1a2e; color: #fff; text-decoration: none; border-radius: 6px; margin-top: 16px;">Log In</a>
     </div>
@@ -48,9 +48,9 @@ const sendKycApproved = async (to) => {
 };
 
 const sendKycRejected = async (to, reason) => {
-  await sendEmail(to, 'ICX Portal — Account Application Update', `
+  await sendEmail(to, 'Compute Exchange — Account Application Update', `
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
-      <h2 style="color: #1a1a2e;">ICX Portal</h2>
+      <h2 style="color: #1a1a2e;">Compute Exchange</h2>
       <p>Unfortunately, your account application has been <strong>rejected</strong>.</p>
       ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
       <p>If you have questions, please contact our support team.</p>
@@ -60,9 +60,9 @@ const sendKycRejected = async (to, reason) => {
 
 const sendRevisionRequested = async (to, flaggedFields) => {
   const fieldList = flaggedFields.map(f => `<li>${f}</li>`).join('');
-  await sendEmail(to, 'ICX Portal — Revision Requested', `
+  await sendEmail(to, 'Compute Exchange — Revision Requested', `
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
-      <h2 style="color: #1a1a2e;">ICX Portal</h2>
+      <h2 style="color: #1a1a2e;">Compute Exchange</h2>
       <p>Your submission requires revisions. Please update the following fields:</p>
       <ul>${fieldList}</ul>
       <a href="${process.env.CLIENT_URL}/login" style="display: inline-block; padding: 12px 24px; background: #1a1a2e; color: #fff; text-decoration: none; border-radius: 6px; margin-top: 16px;">Log In to Revise</a>
@@ -75,9 +75,9 @@ const sendNotificationEmail = async (to, title, message, actionLink) => {
     ? `<a href="${actionLink}" style="display: inline-block; padding: 12px 24px; background: #1a1a2e; color: #fff; text-decoration: none; border-radius: 6px; margin-top: 16px;">View Details</a>`
     : '';
 
-  await sendEmail(to, `ICX Portal — ${title}`, `
+  await sendEmail(to, `Compute Exchange — ${title}`, `
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
-      <h2 style="color: #1a1a2e;">ICX Portal</h2>
+      <h2 style="color: #1a1a2e;">Compute Exchange</h2>
       <h3 style="color: #333;">${title}</h3>
       <p>${message}</p>
       ${buttonHtml}

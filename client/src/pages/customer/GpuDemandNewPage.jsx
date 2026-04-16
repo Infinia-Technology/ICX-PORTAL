@@ -11,7 +11,7 @@ import { useToast } from '../../components/ui/Toast';
 export default function GpuDemandNewPage() {
   const navigate = useNavigate();
   const { addToast } = useToast();
-  const [form, setForm] = useState({ customerName: '', customerCountry: '', technologyType: '', contractLengthYears: '', clusterSizeGpus: '', idealClusterLocation: '', exportConstraints: '', timelineGoLive: '', connectivityMbps: '', latencyMs: '', dcTierMinimum: '', targetPriceGpuHr: '', decisionMaker: '', procurementStage: '', otherComments: '' });
+  const [form, setForm] = useState({ customerName: '', customerCountry: '', technologyType: '', contractLengthYears: '', clusterSizeGpus: '', idealClusterLocation: '', exportConstraints: '', timelineGoLive: '', connectivityMbps: '', latencyMs: '', interconnectivity: '', dcTierMinimum: '', redundancyUptimeRequirements: '', targetPriceGpuHr: '', decisionMaker: '', procurementStage: '', otherComments: '' });
   const [submitting, setSubmitting] = useState(false);
 
   const update = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
@@ -45,7 +45,9 @@ export default function GpuDemandNewPage() {
           <Input label="Export Constraints" name="exportConstraints" value={form.exportConstraints} onChange={update} />
           <Input label="Connectivity (Mbps)" name="connectivityMbps" type="number" value={form.connectivityMbps} onChange={update} />
           <Input label="Latency (ms)" name="latencyMs" type="number" value={form.latencyMs} onChange={update} />
+          <Input label="Interconnectivity" name="interconnectivity" value={form.interconnectivity} onChange={update} placeholder="e.g. n/a, dedicated link, peering" />
           <Select label="DC Tier Minimum" name="dcTierMinimum" value={form.dcTierMinimum} onChange={update} options={['', 'Tier I', 'Tier II', 'Tier III', 'Tier IV'].map((o) => ({ value: o, label: o || 'Select...' }))} />
+          <TextArea label="Redundancy / Uptime Requirements" name="redundancyUptimeRequirements" value={form.redundancyUptimeRequirements} onChange={update} className="sm:col-span-2" placeholder="Describe redundancy and uptime SLA requirements" />
           <Input label="Target Price (GPU/hr)" name="targetPriceGpuHr" value={form.targetPriceGpuHr} onChange={update} />
           <Input label="Decision Maker" name="decisionMaker" value={form.decisionMaker} onChange={update} />
           <Input label="Procurement Stage" name="procurementStage" value={form.procurementStage} onChange={update} />

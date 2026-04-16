@@ -6,16 +6,21 @@ const { uploadFile, deleteFile } = require('../services/s3.service');
 const listClusters = async (req, res, next) => {
   try {
     const { status, includeArchived = false } = req.query;
-    
+    const isAdminRole = ['admin', 'superadmin'].includes(req.user.role);
+
     const where = {
-      supplier_id: req.user.userId,
       type: 'GPU_CLUSTER'
     };
+
+    // Suppliers only see their own clusters; admins see all
+    if (!isAdminRole) {
+      where.supplier_id = req.user.userId;
+    }
 
     if (status) {
       where.status = status.toUpperCase();
     }
-    
+
     if (includeArchived !== 'true') {
       where.archived_at = null;
     }
@@ -26,19 +31,21 @@ const listClusters = async (req, res, next) => {
     });
 
     // Map to the format frontend expects
-    const formatted = clusters.map(c => ({
-      ...c,
-      _id: c.id,
-      vendorName: c.data_center_name,
-      gpu: (c.specifications && typeof c.specifications === 'object') ? c.specifications.gpuTechnology : 'N/A',
-      location: {
-        city: c.city,
-        state: c.state,
-        country: c.country
-      },
-      createdAt: c.created_at,
-      updatedAt: c.updated_at
-    }));
+    const formatted = clusters.map(c => {
+      const specs = (c.specifications && typeof c.specifications === 'object') ? c.specifications : {};
+      return {
+        ...specs,
+        ...c,
+        _id: c.id,
+        vendorName: c.data_center_name,
+        gpuTechnology: specs.gpuTechnology || '',
+        singleClusterSize: specs.singleClusterSize || '',
+        country: c.country || specs.country || '',
+        location: { city: c.city || specs.location, country: c.country || specs.country },
+        createdAt: c.created_at,
+        updatedAt: c.updated_at,
+      };
+    });
 
     res.json({ data: formatted });
   } catch (err) { next(err); }
@@ -47,37 +54,35 @@ const listClusters = async (req, res, next) => {
 // POST /api/gpu-clusters
 const createCluster = async (req, res, next) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
-    if (user?.kyc_status !== 'approved') {
-      return res.status(403).json({ error: 'User must be KYC approved before creating listings' });
-    }
+    const { vendorName, location, country, ...rest } = req.body;
 
-    const { vendorName, ...rest } = req.body;
-    
     const cluster = await prisma.listing.create({
       data: {
         supplier_id: req.user.userId,
         type: 'GPU_CLUSTER',
         data_center_name: vendorName || 'New Cluster',
         status: 'DRAFT',
-        specifications: rest || {},
-        city: req.body.location?.city || req.body.location,
-        country: req.body.location?.country,
+        specifications: { location, country, ...rest },
+        city: location?.city || location || '',
+        country: country || location?.country || '',
       }
     });
 
     await logAction({ userId: req.user.userId, action: 'CREATE_GPU_CLUSTER', targetModel: 'Listing', targetId: cluster.id, ipAddress: req.ip });
-    res.status(201).json(cluster);
+    res.status(201).json({ ...cluster, _id: cluster.id });
   } catch (err) { next(err); }
 };
 
 // GET /api/gpu-clusters/:id
 const getCluster = async (req, res, next) => {
   try {
-    const cluster = await prisma.listing.findFirst({
-      where: { id: req.params.id, supplier_id: req.user.userId }
-    });
-    
+    const isAdminRole = ['admin', 'superadmin'].includes(req.user.role);
+    const where = isAdminRole
+      ? { id: req.params.id, type: 'GPU_CLUSTER' }
+      : { id: req.params.id, supplier_id: req.user.userId, type: 'GPU_CLUSTER' };
+
+    const cluster = await prisma.listing.findFirst({ where });
+
     if (!cluster) return res.status(404).json({ error: 'GPU cluster not found' });
 
     // Map for frontend
@@ -97,25 +102,37 @@ const getCluster = async (req, res, next) => {
 // PUT /api/gpu-clusters/:id
 const updateCluster = async (req, res, next) => {
   try {
-    const cluster = await prisma.listing.findFirst({
-      where: { id: req.params.id, supplier_id: req.user.userId }
-    });
-    
+    const isAdminRole = ['admin', 'superadmin'].includes(req.user.role);
+    const where = isAdminRole
+      ? { id: req.params.id, type: 'GPU_CLUSTER' }
+      : { id: req.params.id, supplier_id: req.user.userId, type: 'GPU_CLUSTER' };
+
+    const cluster = await prisma.listing.findFirst({ where });
+
     if (!cluster) return res.status(404).json({ error: 'GPU cluster not found' });
 
     if (!['DRAFT', 'REVISION_REQUESTED'].includes(cluster.status)) {
       return res.status(400).json({ error: 'Cluster cannot be edited in current status' });
     }
 
-    const { vendorName, location, ...rest } = req.body;
+    const { vendorName, location, country, ...rest } = req.body;
+
+    // Merge new fields into existing specs — don't replace the whole object
+    const existingSpecs = (cluster.specifications && typeof cluster.specifications === 'object') ? cluster.specifications : {};
+    const specUpdates = {};
+    if (location !== undefined) specUpdates.location = location;
+    if (country !== undefined) specUpdates.country = country;
+    for (const [k, v] of Object.entries(rest)) {
+      if (v !== undefined) specUpdates[k] = v;
+    }
 
     const updated = await prisma.listing.update({
       where: { id: req.params.id },
       data: {
-        data_center_name: vendorName,
-        city: location?.city || location,
-        country: location?.country,
-        specifications: rest || {},
+        data_center_name: vendorName || cluster.data_center_name,
+        city: location?.city || (typeof location === 'string' ? location : null) || cluster.city || '',
+        country: country || location?.country || cluster.country || '',
+        specifications: { ...existingSpecs, ...specUpdates },
         updated_at: new Date()
       }
     });
@@ -134,9 +151,12 @@ const updateCluster = async (req, res, next) => {
 // POST /api/gpu-clusters/:id/submit
 const submitCluster = async (req, res, next) => {
   try {
-    const cluster = await prisma.listing.findFirst({
-      where: { id: req.params.id, supplier_id: req.user.userId }
-    });
+    const isAdminRole = ['admin', 'superadmin'].includes(req.user.role);
+    const where = isAdminRole
+      ? { id: req.params.id, type: 'GPU_CLUSTER' }
+      : { id: req.params.id, supplier_id: req.user.userId, type: 'GPU_CLUSTER' };
+
+    const cluster = await prisma.listing.findFirst({ where });
     
     if (!cluster) return res.status(404).json({ error: 'GPU cluster not found' });
 
@@ -160,9 +180,12 @@ const submitCluster = async (req, res, next) => {
 // POST /api/gpu-clusters/:id/resubmit
 const resubmitCluster = async (req, res, next) => {
   try {
-    const cluster = await prisma.listing.findFirst({
-      where: { id: req.params.id, supplier_id: req.user.userId }
-    });
+    const isAdminRole = ['admin', 'superadmin'].includes(req.user.role);
+    const where = isAdminRole
+      ? { id: req.params.id, type: 'GPU_CLUSTER' }
+      : { id: req.params.id, supplier_id: req.user.userId, type: 'GPU_CLUSTER' };
+
+    const cluster = await prisma.listing.findFirst({ where });
     
     if (!cluster) return res.status(404).json({ error: 'GPU cluster not found' });
 
@@ -186,9 +209,12 @@ const resubmitCluster = async (req, res, next) => {
 // POST /api/gpu-clusters/:id/refresh
 const refreshCluster = async (req, res, next) => {
   try {
-    const cluster = await prisma.listing.findFirst({
-      where: { id: req.params.id, supplier_id: req.user.userId }
-    });
+    const isAdminRole = ['admin', 'superadmin'].includes(req.user.role);
+    const where = isAdminRole
+      ? { id: req.params.id, type: 'GPU_CLUSTER' }
+      : { id: req.params.id, supplier_id: req.user.userId, type: 'GPU_CLUSTER' };
+
+    const cluster = await prisma.listing.findFirst({ where });
     
     if (!cluster) return res.status(404).json({ error: 'GPU cluster not found' });
 
@@ -220,7 +246,7 @@ module.exports = {
       if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
       const cluster = await prisma.listing.findFirst({
-        where: { id: id, organization_id: req.user.organization_id, type: 'GPU_CLUSTER' }
+        where: { id: id, supplier_id: req.user.userId, type: 'GPU_CLUSTER' }
       });
       if (!cluster) return res.status(404).json({ error: 'GPU cluster not found or access denied' });
 

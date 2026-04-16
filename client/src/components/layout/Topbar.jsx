@@ -78,8 +78,9 @@ export default function Topbar() {
 
   return (
     <header className="h-[var(--topbar-height)] bg-[var(--color-surface)] border-b border-[var(--color-border)] fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-6">
-      <div className="flex items-center gap-3">
-        <h1 className="text-lg font-bold text-[var(--color-primary)]">ICX Portal</h1>
+      <div className="flex flex-col items-start gap-0.5">
+        <img src="/logo.svg" alt="Infinia" className="h-5 w-auto" />
+        <span className="text-[11px] font-medium tracking-wide text-[var(--color-text-secondary)] leading-none">Compute Exchange</span>
       </div>
 
       <div className="flex items-center gap-4">

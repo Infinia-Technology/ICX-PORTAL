@@ -77,7 +77,7 @@ export default function AdminSettingsPage() {
         <div className="space-y-3">
           <div className="flex justify-between text-sm">
             <span className="text-[var(--color-text-secondary)]">Platform</span>
-            <span className="font-medium">ICX Portal</span>
+            <span className="font-medium">Compute Exchange</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-[var(--color-text-secondary)]">Version</span>

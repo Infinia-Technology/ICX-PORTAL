@@ -52,16 +52,7 @@ const requestOtp = async (req, res, next) => {
 
     const { plainCode } = await createOtp(email, 'login');
 
-    if (isDev) {
-      console.log(`[DEV] OTP for ${email}: ${plainCode}`);
-    }
-
-    try {
-      await sendOtpEmail(email, plainCode);
-    } catch (emailErr) {
-      console.error('[EMAIL] Failed to send OTP:', emailErr.message);
-      if (!isDev) throw emailErr;
-    }
+    await sendOtpEmail(email, plainCode);
 
     logAction({ action: 'OTP_REQUESTED', changes: { email }, ipAddress: req.ip }).catch(() => {});
 
@@ -86,15 +77,7 @@ const resendOtp = async (req, res, next) => {
 
     const { plainCode } = await createOtp(email, 'login');
 
-    if (isDev) {
-      console.log(`[DEV] OTP for ${email}: ${plainCode}`);
-    }
-
-    try {
-      await sendOtpEmail(email, plainCode);
-    } catch (emailErr) {
-      if (!isDev) throw emailErr;
-    }
+    await sendOtpEmail(email, plainCode);
 
     logAction({ action: 'OTP_RESENT', changes: { email }, ipAddress: req.ip }).catch(() => {});
 

@@ -1,23 +1,29 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, Trash2, Users } from 'lucide-react';
+import { UserPlus, Trash2, Users, AlertTriangle } from 'lucide-react';
 import api from '../../lib/api';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
+import Select from '../../components/ui/Select';
 import Modal from '../../components/ui/Modal';
 import Spinner from '../../components/ui/Spinner';
 import { useToast } from '../../components/ui/Toast';
 
-const PERMISSIONS = ['documents', 'site_details', 'technical', 'commercial', 'phasing', 'financials'];
+const ROLE_OPTIONS = [
+  { value: 'subordinate', label: 'Subordinate — can view and edit listings' },
+  { value: 'viewer', label: 'Viewer — read-only access to listings' },
+];
 
 export default function TeamPage() {
   const [team, setTeam] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [email, setEmail] = useState('');
-  const [permissions, setPermissions] = useState([]);
+  const [role, setRole] = useState('subordinate');
   const [submitting, setSubmitting] = useState(false);
+  // Confirm revoke modal state
+  const [confirmModal, setConfirmModal] = useState({ open: false, inviteId: null, email: '' });
   const { addToast } = useToast();
 
   const load = () => {
@@ -30,11 +36,11 @@ export default function TeamPage() {
     if (!email) return;
     setSubmitting(true);
     try {
-      await api.post('/supplier/team/invite', { email, permissions });
-      addToast({ type: 'success', message: 'Invitation sent' });
+      await api.post('/supplier/team/invite', { email, role });
+      addToast({ type: 'success', message: 'Invitation sent — they will receive an email with an invite link' });
       setShowModal(false);
       setEmail('');
-      setPermissions([]);
+      setRole('subordinate');
       load();
     } catch (err) {
       addToast({ type: 'error', message: err.response?.data?.error || 'Failed to send invite' });
@@ -43,19 +49,19 @@ export default function TeamPage() {
     }
   };
 
-  const revoke = async (id) => {
-    if (!confirm('Revoke this team member\'s access?')) return;
+  const openRevoke = (invite) => {
+    setConfirmModal({ open: true, inviteId: invite._id || invite.id, email: invite.email });
+  };
+
+  const confirmRevoke = async () => {
     try {
-      await api.delete(`/supplier/team/${id}`);
+      await api.delete(`/supplier/team/${confirmModal.inviteId}`);
       addToast({ type: 'success', message: 'Access revoked' });
+      setConfirmModal({ open: false, inviteId: null, email: '' });
       load();
     } catch (err) {
       addToast({ type: 'error', message: 'Failed to revoke access' });
     }
-  };
-
-  const togglePermission = (p) => {
-    setPermissions((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]);
   };
 
   if (loading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
@@ -65,7 +71,7 @@ export default function TeamPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Team Management</h1>
-          <p className="text-[var(--color-text-secondary)] text-sm mt-1">Invite and manage subordinate team members</p>
+          <p className="text-[var(--color-text-secondary)] text-sm mt-1">Invite and manage team members</p>
         </div>
         <Button leftIcon={<UserPlus className="w-4 h-4" />} onClick={() => setShowModal(true)}>Invite Member</Button>
       </div>
@@ -79,22 +85,18 @@ export default function TeamPage() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {team.map((invite) => (
-            <Card key={invite._id} className="flex items-center justify-between">
+          {team.map((member) => (
+            <Card key={member._id || member.id} className="flex items-center justify-between">
               <div>
-                <p className="font-medium">{invite.email}</p>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {invite.permissions?.map((p) => (
-                    <Badge key={p} variant="default" className="text-xs">{p.replace(/_/g, ' ')}</Badge>
-                  ))}
-                </div>
+                <p className="font-medium">{member.email}</p>
+                <p className="text-xs text-[var(--color-text-secondary)] mt-0.5 capitalize">{member.role || 'subordinate'}</p>
               </div>
               <div className="flex items-center gap-3">
-                <Badge variant={invite.status === 'ACCEPTED' ? 'success' : invite.status === 'REVOKED' ? 'error' : 'warning'}>
-                  {invite.status}
+                <Badge variant={member.status === 'ACCEPTED' ? 'success' : member.status === 'REVOKED' ? 'error' : 'warning'}>
+                  {member.status}
                 </Badge>
-                {invite.status !== 'REVOKED' && (
-                  <Button size="sm" variant="ghost" onClick={() => revoke(invite._id)}>
+                {member.status !== 'REVOKED' && (
+                  <Button size="sm" variant="ghost" onClick={() => openRevoke(member)}>
                     <Trash2 className="w-4 h-4 text-red-500" />
                   </Button>
                 )}
@@ -104,23 +106,38 @@ export default function TeamPage() {
         </div>
       )}
 
+      {/* Invite Modal */}
       <Modal open={showModal} onClose={() => setShowModal(false)} title="Invite Team Member">
         <div className="space-y-4">
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            An invite link will be sent to their email. It expires in 48 hours.
+          </p>
           <Input label="Email Address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="colleague@company.com" />
-          <div>
-            <p className="text-sm font-medium mb-2">Permissions</p>
-            <div className="grid grid-cols-2 gap-2">
-              {PERMISSIONS.map((p) => (
-                <label key={p} className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={permissions.includes(p)} onChange={() => togglePermission(p)} className="rounded" />
-                  <span className="text-sm capitalize">{p.replace(/_/g, ' ')}</span>
-                </label>
-              ))}
-            </div>
-          </div>
+          <Select
+            label="Access Level"
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            options={ROLE_OPTIONS}
+          />
           <div className="flex justify-end gap-3">
             <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
             <Button onClick={invite} loading={submitting}>Send Invite</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Revoke Confirm Modal */}
+      <Modal open={confirmModal.open} onClose={() => setConfirmModal({ open: false, inviteId: null, email: '' })} title="Revoke Access">
+        <div className="space-y-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              Are you sure you want to revoke access for <strong>{confirmModal.email}</strong>? They will no longer be able to access your organization's data.
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setConfirmModal({ open: false, inviteId: null, email: '' })}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmRevoke}>Revoke Access</Button>
           </div>
         </div>
       </Modal>
