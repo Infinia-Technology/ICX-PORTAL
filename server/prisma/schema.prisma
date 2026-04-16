@@ -1,0 +1,400 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  superadmin
+  admin
+  supplier
+  broker
+  customer
+  reader
+  viewer
+  subordinate
+}
+
+enum KycStatus {
+  submitted
+  approved
+}
+
+enum ListingType {
+  DC_SITE
+  GPU_CLUSTER
+}
+
+enum ListingStatus {
+  DRAFT
+  SUBMITTED
+  IN_REVIEW
+  REVISION_REQUESTED
+  RESUBMITTED
+  APPROVED
+  REJECTED
+  MATCHED
+  CLOSED
+  AVAILABLE
+  RESERVED
+  SOLD
+  ARCHIVED
+}
+
+enum OrgType {
+  SUPPLIER
+  BROKER
+  CUSTOMER
+}
+
+enum OrgStatus {
+  PENDING
+  SUBMITTED
+  APPROVED
+  REJECTED
+  REVISION_REQUESTED
+}
+
+model Organization {
+  id              String      @id @default(uuid()) @db.Uuid
+  type            OrgType
+  status          OrgStatus   @default(PENDING)
+  
+  // KYC / Profile fields
+  vendor_type     String?
+  mandate_status  String?
+  nda_required    Boolean     @default(false)
+  nda_signed      Boolean     @default(false)
+  contact_email   String
+  contact_number  String?
+  
+  // Customer fields
+  company_name          String?
+  company_type          String?
+  jurisdiction          String?
+  industry_sector       String?
+  tax_vat_number        String?
+  company_address       String?
+  website               String?
+  auth_signatory_name   String?
+  auth_signatory_title  String?
+  billing_contact_name  String?
+  billing_contact_email String?
+  primary_use_cases     String[]
+  location_preferences  String[]
+  sovereignty_reqs      String[]
+  compliance_reqs       String[]
+  budget_range          String?
+  urgency               String?
+  
+  // Admin fields
+  flagged_fields  String[]
+  field_comments  Json?       @default("{}")
+  reviewed_by     String?     @db.Uuid
+  approved_at     DateTime?
+  
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+
+  users           User[]
+  listings        Listing[]
+  team_invites    TeamInvite[]
+  broker_companies BrokerDcCompany[]
+  inquiries       Inquiry[]
+}
+
+model User {
+  id              String           @id @default(uuid()) @db.Uuid
+  name            String?
+  email           String           @unique
+  role            Role
+  kyc_status      KycStatus?
+  organization_id String?          @db.Uuid
+  organization    Organization?    @relation(fields: [organization_id], references: [id])
+  isActive        Boolean          @default(true)
+  created_at      DateTime         @default(now())
+  updated_at      DateTime         @updatedAt
+
+  listings         Listing[]
+  reservations     Reservation[]
+  notifications    Notification[]
+  audit_logs       AuditLog[]
+  report_templates ReportTemplate[]
+  team_invites     TeamInvite[]     @relation("InvitesSent")
+  received_invites TeamInvite[]     @relation("InvitesReceived")
+  assigned_queue   QueueItem[]      @relation("AssignedAdmins")
+  inquiries        Inquiry[]
+  archives_sent     Archive[]        @relation("ArchivedBy")
+  archives_restored Archive[]        @relation("RestoredBy")
+
+  @@index([organization_id])
+}
+
+model Listing {
+  id                String        @id @default(uuid()) @db.Uuid
+  supplier_id       String        @db.Uuid
+  supplier          User          @relation(fields: [supplier_id], references: [id])
+  organization_id   String?       @db.Uuid
+  organization      Organization? @relation(fields: [organization_id], references: [id])
+  type              ListingType   @default(GPU_CLUSTER)
+  data_center_name  String?
+  country           String?
+  state             String?
+  city              String?
+  total_units       Int           @default(0)
+  booked_units      Int           @default(0)
+  available_units   Int           @default(0)
+  total_mw          Float?
+  available_mw      Float?
+  price             Float?
+  currency          String?       @default("USD")
+  status            ListingStatus @default(DRAFT)
+  specifications    Json?         @default("{}")
+  metadata          Json?         @default("{}")
+  contract_duration String?
+  archived_at       DateTime?
+  archive_reason    String?
+  created_at        DateTime      @default(now())
+  updated_at        DateTime      @updatedAt
+
+  reservations Reservation[]
+  sites        DcSite[]
+  documents    ListingDocument[]
+
+  @@index([supplier_id])
+  @@index([organization_id])
+  @@index([status])
+  @@index([type])
+}
+
+model DcSite {
+  id               String   @id @default(uuid()) @db.Uuid
+  listing_id       String   @db.Uuid
+  listing          Listing  @relation(fields: [listing_id], references: [id], onDelete: Cascade)
+  site_name        String
+  specifications   Json?    @default("{}")
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  documents DcDocument[]
+  phasing   DcPhasingSchedule[]
+
+  @@index([listing_id])
+}
+
+model DcPhasingSchedule {
+  id                    String   @id @default(uuid()) @db.Uuid
+  site_id               String   @db.Uuid
+  site                  DcSite   @relation(fields: [site_id], references: [id], onDelete: Cascade)
+  month                 DateTime
+  it_load_mw            Float?
+  cumulative_it_load_mw Float?
+  scope_of_works        String?
+  estimated_capex_musd  Float?
+  phase                 String?
+  min_lease_duration_yrs Int?
+  nrc_request_musd      Float?
+  initial_deposit_musd  Float?
+  mrc_request_per_kw    Float?
+  mrc_inclusions        String?
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  @@index([site_id])
+}
+
+model DcDocument {
+  id            String   @id @default(uuid()) @db.Uuid
+  site_id       String   @db.Uuid
+  site          DcSite   @relation(fields: [site_id], references: [id], onDelete: Cascade)
+  document_type String
+  file_name     String
+  file_url      String
+  file_size     Int
+  mime_type     String
+  uploaded_by   String   @db.Uuid
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@index([site_id])
+}
+
+model ListingDocument {
+  id            String   @id @default(uuid()) @db.Uuid
+  listing_id    String   @db.Uuid
+  listing       Listing  @relation(fields: [listing_id], references: [id], onDelete: Cascade)
+  document_type String
+  file_name     String
+  file_url      String
+  file_size     Int
+  mime_type     String
+  uploaded_by   String   @db.Uuid
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@index([listing_id])
+}
+
+model Reservation {
+  id             String   @id @default(uuid()) @db.Uuid
+  listing_id     String   @db.Uuid
+  listing        Listing  @relation(fields: [listing_id], references: [id])
+  customer_id    String   @db.Uuid
+  customer       User     @relation(fields: [customer_id], references: [id])
+  reserved_units Int
+  start_date     DateTime
+  end_date       DateTime
+  status         String
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+}
+
+model Notification {
+  id         String   @id @default(uuid()) @db.Uuid
+  user_id    String   @db.Uuid
+  user       User     @relation(fields: [user_id], references: [id])
+  type       String
+  title      String
+  message    String?
+  link       String?
+  metadata   Json?
+  is_read    Boolean  @default(false)
+  sent_via   String[] @default(["in-app"])
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model AuditLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  user_id      String?  @db.Uuid
+  user         User?    @relation(fields: [user_id], references: [id])
+  action       String
+  target_model String?
+  target_id    String?
+  changes      Json?
+  ip_address   String?
+  timestamp    DateTime @default(now())
+}
+
+model Otp {
+  id         String   @id @default(uuid()) @db.Uuid
+  email      String
+  code       String
+  purpose    String   @default("login")
+  attempts   Int      @default(0)
+  verified   Boolean  @default(false)
+  expires_at DateTime
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([email])
+}
+
+model ReportTemplate {
+  id              String   @id @default(uuid()) @db.Uuid
+  user_id         String   @db.Uuid
+  user            User     @relation(fields: [user_id], references: [id])
+  name            String
+  description     String?
+  report_type     String   @default("DC_LISTINGS")
+  selected_fields Json
+  filters         Json
+  sort_by         String?
+  sort_direction  String?
+  group_by        String?
+  export_format   String?
+  is_favorite     Boolean  @default(false)
+  usage_count     Int      @default(0)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+}
+
+model QueueItem {
+  id              String      @id @default(uuid()) @db.Uuid
+  type            String
+  reference_id    String      @db.Uuid
+  reference_model String
+  status          String      @default("NEW")
+  priority        Int         @default(0)
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+
+  assigned_to     User[]      @relation("AssignedAdmins")
+
+  @@index([reference_id])
+}
+
+model BrokerDcCompany {
+  id                String   @id @default(uuid()) @db.Uuid
+  organization_id   String   @db.Uuid
+  organization      Organization @relation(fields: [organization_id], references: [id])
+  legal_entity      String
+  office_address    String
+  country_of_incorp String
+  contact_name      String?
+  contact_email     String?
+  contact_mobile    String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  @@index([organization_id])
+}
+
+model TeamInvite {
+  id              String   @id @default(uuid()) @db.Uuid
+  organization_id String   @db.Uuid
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  inviter_id      String   @db.Uuid
+  inviter         User     @relation("InvitesSent", fields: [inviter_id], references: [id])
+  email           String
+  role            String   @default("subordinate")
+  status          String   @default("PENDING")
+  token           String?  @unique  // secure token for invite link
+  expires_at      DateTime?         // token expiry (48h from creation)
+  accepted_at     DateTime?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  user            User?    @relation("InvitesReceived", fields: [email], references: [email])
+
+  @@index([organization_id])
+  @@index([email])
+}
+
+model Inquiry {
+  id              String        @id @default(uuid()) @db.Uuid
+  user_id         String        @db.Uuid
+  user            User          @relation(fields: [user_id], references: [id])
+  organization_id String?       @db.Uuid
+  organization    Organization? @relation(fields: [organization_id], references: [id])
+  type            String        // GPU_DEMAND or DC_REQUEST
+  status          String        @default("NEW")
+  specifications  Json?         @default("{}")
+  created_at      DateTime      @default(now())
+  updated_at      DateTime      @updatedAt
+
+  @@index([user_id])
+  @@index([organization_id])
+}
+model Archive {
+  id              String    @id @default(uuid()) @db.Uuid
+  target_model    String    // 'Listing', etc.
+  target_id       String    @db.Uuid
+  organization_id String?   @db.Uuid
+  reason          String?
+  reason_text     String?
+  archived_by     String?   @db.Uuid
+  archived_at     DateTime  @default(now())
+  restored_at     DateTime?
+  restored_by     String?   @db.Uuid
+  isActive        Boolean   @default(true)
+
+  user_archived   User?     @relation("ArchivedBy", fields: [archived_by], references: [id])
+  user_restored   User?     @relation("RestoredBy", fields: [restored_by], references: [id])
+
+  @@index([target_id])
+  @@index([organization_id])
+}
