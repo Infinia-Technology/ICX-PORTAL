@@ -12,11 +12,15 @@ const dcSiteRoutes = require('./routes/dcSite.routes');
 const gpuClusterRoutes = require('./routes/gpuCluster.routes');
 const gpuDemandRoutes = require('./routes/gpuDemand.routes');
 const dcRequestRoutes = require('./routes/dcRequest.routes');
+const inventoryRoutes = require('./routes/inventory.routes');
+const archiveRoutes = require('./routes/archive.routes');
+const auditLogRoutes = require('./routes/auditLog.routes');
 const adminRoutes = require('./routes/admin.routes');
 const superadminRoutes = require('./routes/superadmin.routes');
 const marketplaceRoutes = require('./routes/marketplace.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const reportRoutes = require('./routes/report.routes');
+const duplicatesRoutes = require('./routes/duplicates.routes');
 const accountRoutes = require('./routes/account.routes');
 
 const app = express();
@@ -51,11 +55,15 @@ app.use('/api/dc-sites', dcSiteRoutes);
 app.use('/api/gpu-clusters', gpuClusterRoutes);
 app.use('/api/gpu-demands', gpuDemandRoutes);
 app.use('/api/dc-requests', dcRequestRoutes);
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/archive', archiveRoutes);
+app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/superadmin', superadminRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/duplicates', duplicatesRoutes);
 app.use('/api/account', accountRoutes);
 
 // Error handler (must be last)

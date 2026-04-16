@@ -11,6 +11,13 @@ const statusColors = {
   MATCHED: 'bg-teal-50 text-teal-700',
   CLOSED: 'bg-gray-100 text-gray-700',
   NEW: 'bg-blue-50 text-blue-700',
+  AVAILABLE: 'bg-green-50 text-green-700',
+  RESERVED: 'bg-orange-50 text-orange-700',
+  SOLD: 'bg-red-50 text-red-700',
+  ARCHIVED: 'bg-gray-100 text-gray-500',
+  ACTIVE: 'bg-green-50 text-green-700',
+  EXPIRED: 'bg-gray-100 text-gray-500',
+  CANCELLED: 'bg-red-50 text-red-700',
 };
 
 const variantColors = {

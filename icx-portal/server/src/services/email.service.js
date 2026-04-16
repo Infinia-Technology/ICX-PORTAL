@@ -70,6 +70,21 @@ const sendRevisionRequested = async (to, flaggedFields) => {
   `);
 };
 
+const sendNotificationEmail = async (to, title, message, actionLink) => {
+  const buttonHtml = actionLink
+    ? `<a href="${actionLink}" style="display: inline-block; padding: 12px 24px; background: #1a1a2e; color: #fff; text-decoration: none; border-radius: 6px; margin-top: 16px;">View Details</a>`
+    : '';
+
+  await sendEmail(to, `ICX Portal — ${title}`, `
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+      <h2 style="color: #1a1a2e;">ICX Portal</h2>
+      <h3 style="color: #333;">${title}</h3>
+      <p>${message}</p>
+      ${buttonHtml}
+    </div>
+  `);
+};
+
 module.exports = {
   sendOtpEmail,
   sendEmail,
@@ -77,4 +92,5 @@ module.exports = {
   sendKycApproved,
   sendKycRejected,
   sendRevisionRequested,
+  sendNotificationEmail,
 };

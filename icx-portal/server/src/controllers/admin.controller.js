@@ -84,7 +84,32 @@ const getSupplier = async (req, res, next) => {
       return res.status(404).json({ error: 'Supplier not found' });
     }
     const users = await User.find({ organizationId: org._id }).select('email role isActive lastLoginAt');
-    res.json({ ...org.toObject(), users });
+
+    // Get listing statistics
+    const dcListings = await DcApplication.find({ organizationId: org._id });
+    const gpuListings = await GpuClusterListing.find({ organizationId: org._id });
+
+    const dcStats = {
+      total: dcListings.length,
+      approved: dcListings.filter((l) => l.status === 'APPROVED').length,
+      draft: dcListings.filter((l) => l.status === 'DRAFT').length,
+      pending: dcListings.filter((l) => ['SUBMITTED', 'IN_REVIEW', 'RESUBMITTED'].includes(l.status)).length,
+      archived: dcListings.filter((l) => l.isArchived).length,
+    };
+
+    const gpuStats = {
+      total: gpuListings.length,
+      approved: gpuListings.filter((l) => l.status === 'APPROVED').length,
+      draft: gpuListings.filter((l) => l.status === 'DRAFT').length,
+      pending: gpuListings.filter((l) => ['SUBMITTED', 'IN_REVIEW', 'RESUBMITTED'].includes(l.status)).length,
+      archived: gpuListings.filter((l) => l.isArchived).length,
+    };
+
+    res.json({
+      ...org.toObject(),
+      users,
+      listingStats: { dc: dcStats, gpu: gpuStats },
+    });
   } catch (err) { next(err); }
 };
 
@@ -157,14 +182,28 @@ const reviewSupplierKyc = async (req, res, next) => {
 // GET /api/admin/dc-listings
 const getDcListings = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, status } = req.query;
+    const { page = 1, limit = 20, status, includeArchived = false } = req.query;
     const filter = {};
     if (status) filter.status = status;
+    if (includeArchived !== 'true') filter.isArchived = false;
 
     const result = await paginate(DcApplication, filter, {
       page: parseInt(page), limit: parseInt(limit), sort: '-createdAt',
-      populate: [{ path: 'organizationId', select: 'type status contactEmail' }],
+      populate: [{ path: 'organizationId', select: 'type status contactEmail companyName' }],
     });
+
+    // Add draft duration calculation
+    result.data = result.data.map((item) => {
+      const obj = item.toObject ? item.toObject() : item;
+      if (obj.status === 'DRAFT') {
+        const daysOld = Math.floor(
+          (new Date() - new Date(obj.createdAt)) / (1000 * 60 * 60 * 24),
+        );
+        obj.draftDurationDays = daysOld;
+      }
+      return obj;
+    });
+
     res.json(result);
   } catch (err) { next(err); }
 };
@@ -259,14 +298,28 @@ const reviewDcListing = async (req, res, next) => {
 // GET /api/admin/gpu-clusters
 const getGpuClusters = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, status } = req.query;
+    const { page = 1, limit = 20, status, includeArchived = false } = req.query;
     const filter = {};
     if (status) filter.status = status;
+    if (includeArchived !== 'true') filter.isArchived = false;
 
     const result = await paginate(GpuClusterListing, filter, {
       page: parseInt(page), limit: parseInt(limit), sort: '-createdAt',
-      populate: [{ path: 'organizationId', select: 'type status contactEmail' }],
+      populate: [{ path: 'organizationId', select: 'type status contactEmail companyName' }],
     });
+
+    // Add draft duration calculation
+    result.data = result.data.map((item) => {
+      const obj = item.toObject ? item.toObject() : item;
+      if (obj.status === 'DRAFT') {
+        const daysOld = Math.floor(
+          (new Date() - new Date(obj.createdAt)) / (1000 * 60 * 60 * 24),
+        );
+        obj.draftDurationDays = daysOld;
+      }
+      return obj;
+    });
+
     res.json(result);
   } catch (err) { next(err); }
 };

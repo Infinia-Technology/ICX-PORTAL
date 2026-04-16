@@ -14,6 +14,8 @@ import PhoneInput from '../../components/ui/PhoneInput';
 import LocationInput from '../../components/ui/LocationInput';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import AutoSaveIndicator from '../../components/ui/AutoSaveIndicator';
+import DuplicateWarningModal from '../../components/ui/DuplicateWarningModal';
+import InfoIcon from '../../components/ui/InfoIcon';
 
 const STEPS = [
   'Company Details', 'Site Details', 'Master Plan',
@@ -33,6 +35,7 @@ export default function DcListingNewPage() {
   const [siteId, setSiteId] = useState(searchParams.get('siteId') || null);
   const [submitting, setSubmitting] = useState(false);
   const [loadingDraft, setLoadingDraft] = useState(!!searchParams.get('appId'));
+  const [duplicateModal, setDuplicateModal] = useState({ open: false, duplicates: [], hasDuplicates: false });
 
   const [step1, setStep1] = useState({ companyLegalEntity: '', companyOfficeAddress: '', companyCountry: '', contactName: '', contactEmail: '', contactMobile: '', otherDetails: '' });
   const [step2, setStep2] = useState({ siteName: '', projectType: '', currentProjectStatus: '', businessModel: '', sovereigntyRestrictions: '', regulatoryCompliance: '', airGapped: false, landSizeSqm: '', buildingCount: '', dataHallCount: '', address: '', stateRegion: '', country: '', coordinates: '' });
@@ -181,17 +184,28 @@ export default function DcListingNewPage() {
     updateUrl(null, null, prevStep);
   };
 
-  const submit = async () => {
+  const submit = async (force = false) => {
     setSubmitting(true);
     try {
-      await api.post(`/dc-applications/${appId}/submit`);
+      const res = await api.post(`/dc-applications/${appId}/submit`, { force });
+
+      // If duplicates found, show modal instead of submitting
+      if (res.data.hasDuplicates) {
+        setDuplicateModal({ open: true, duplicates: res.data.duplicates, hasDuplicates: true });
+        setSubmitting(false);
+        return;
+      }
+
       addToast({ type: 'success', message: 'DC listing submitted for review!' });
       navigate('/supplier/dc-listings');
     } catch (err) {
       addToast({ type: 'error', message: err.response?.data?.error || 'Failed to submit' });
-    } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleContinueWithDuplicates = async () => {
+    await submit(true); // Force submit bypassing duplicate check
   };
 
   if (loadingDraft) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
@@ -201,7 +215,13 @@ export default function DcListingNewPage() {
       case 0:
         return (
           <div className="grid sm:grid-cols-2 gap-4">
-            <Input label="Company Legal Entity *" name="companyLegalEntity" value={step1.companyLegalEntity} onChange={f(setStep1)} />
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="text-sm font-medium">Company Legal Entity *</label>
+                <InfoIcon text="Official company name. Used for duplicate detection via company name matching." placement="top" />
+              </div>
+              <Input name="companyLegalEntity" value={step1.companyLegalEntity} onChange={f(setStep1)} />
+            </div>
             <Input label="Office Address *" name="companyOfficeAddress" value={step1.companyOfficeAddress} onChange={f(setStep1)} />
             <Input label="Country *" name="companyCountry" value={step1.companyCountry} onChange={f(setStep1)} />
             <Input label="Contact Name *" name="contactName" value={step1.contactName} onChange={f(setStep1)} />
@@ -219,10 +239,22 @@ export default function DcListingNewPage() {
             <Select label="Business Model" name="businessModel" value={step2.businessModel} onChange={f(setStep2)} options={['', 'Colocation (Wholesale/Retail)', 'Powered Shell', 'Build-to-Suit'].map((o) => ({ value: o, label: o || 'Select...' }))} />
             <Select label="Sovereignty Restrictions" name="sovereigntyRestrictions" value={step2.sovereigntyRestrictions} onChange={f(setStep2)} options={['', 'None', 'Domestic Only', 'Sovereign Cloud Capable', 'Restricted', 'Government-Sensitive'].map((o) => ({ value: o, label: o || 'Select...' }))} />
             <Select label="Regulatory Compliance" name="regulatoryCompliance" value={step2.regulatoryCompliance} onChange={f(setStep2)} options={['', 'GDPR', 'Local Law', 'GDPR + Local Law'].map((o) => ({ value: o, label: o || 'Select...' }))} />
-            <Input label="Address *" name="address" value={step2.address} onChange={f(setStep2)} />
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="text-sm font-medium">Address *</label>
+                <InfoIcon text="Street address or location details. Used for duplicate detection." placement="top" />
+              </div>
+              <Input name="address" value={step2.address} onChange={f(setStep2)} />
+            </div>
             <Input label="State/Region *" name="stateRegion" value={step2.stateRegion} onChange={f(setStep2)} />
             <Input label="Country *" name="country" value={step2.country} onChange={f(setStep2)} />
-            <LocationInput label="Google Maps Link" name="coordinates" value={step2.coordinates} onChange={f(setStep2)} />
+            <div className="sm:col-span-2">
+              <div className="flex items-center gap-2 mb-2">
+                <label className="text-sm font-medium">Google Maps Link</label>
+                <InfoIcon text="Precise location for GPS-based duplicate detection (50-100m radius)." placement="top" />
+              </div>
+              <LocationInput name="coordinates" value={step2.coordinates} onChange={f(setStep2)} />
+            </div>
             <Input label="Land Size (sqm)" name="landSizeSqm" type="number" value={step2.landSizeSqm} onChange={f(setStep2)} />
             <Input label="Building Count" name="buildingCount" type="number" value={step2.buildingCount} onChange={f(setStep2)} />
             <Input label="Data Hall Count" name="dataHallCount" type="number" value={step2.dataHallCount} onChange={f(setStep2)} />
@@ -390,6 +422,14 @@ export default function DcListingNewPage() {
           <Button onClick={submit} loading={submitting} disabled={!appId}>Submit Listing</Button>
         )}
       </div>
+
+      <DuplicateWarningModal
+        open={duplicateModal.open}
+        onClose={() => setDuplicateModal({ open: false, duplicates: [], hasDuplicates: false })}
+        duplicates={duplicateModal.duplicates}
+        onContinue={handleContinueWithDuplicates}
+        loading={submitting}
+      />
     </div>
   );
 }

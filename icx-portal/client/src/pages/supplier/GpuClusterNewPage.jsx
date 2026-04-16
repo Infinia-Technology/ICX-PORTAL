@@ -11,6 +11,8 @@ import { useToast } from '../../components/ui/Toast';
 import LocationInput from '../../components/ui/LocationInput';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import AutoSaveIndicator from '../../components/ui/AutoSaveIndicator';
+import DuplicateWarningModal from '../../components/ui/DuplicateWarningModal';
+import InfoIcon from '../../components/ui/InfoIcon';
 
 const STEPS = ['Basic Info', 'Compute Node', 'Compute Network', 'Management Network', 'OOB & Storage', 'Cluster Description', 'Power & Facility', 'Review & Submit'];
 
@@ -22,6 +24,7 @@ export default function GpuClusterNewPage() {
   const [clusterId, setClusterId] = useState(searchParams.get('id') || null);
   const [submitting, setSubmitting] = useState(false);
   const [loadingDraft, setLoadingDraft] = useState(!!searchParams.get('id'));
+  const [duplicateModal, setDuplicateModal] = useState({ open: false, duplicates: [], hasDuplicates: false });
 
   const [s1, setS1] = useState({ vendorName: '', location: '', country: '', gpuTechnology: '', googleMapsLink: '', dcLandlord: '', totalGpuCount: '', singleClusterSize: '', availabilityDate: '', notes: '', restrictedUse: '' });
   const [s2, setS2] = useState({ gpuServerModel: '', cpu: '', gpu: '', ram: '', localStorage: '', nics: '' });
@@ -107,17 +110,28 @@ export default function GpuClusterNewPage() {
     }
   };
 
-  const submit = async () => {
+  const submit = async (force = false) => {
     setSubmitting(true);
     try {
-      await api.post(`/gpu-clusters/${clusterId}/submit`);
+      const res = await api.post(`/gpu-clusters/${clusterId}/submit`, { force });
+
+      // If duplicates found, show modal instead of submitting
+      if (res.data.hasDuplicates) {
+        setDuplicateModal({ open: true, duplicates: res.data.duplicates, hasDuplicates: true });
+        setSubmitting(false);
+        return;
+      }
+
       addToast({ type: 'success', message: 'GPU listing submitted for review!' });
       navigate('/supplier/gpu-clusters');
     } catch (err) {
       addToast({ type: 'error', message: err.response?.data?.error || 'Failed to submit' });
-    } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleContinueWithDuplicates = async () => {
+    await submit(true); // Force submit bypassing duplicate check
   };
 
   if (loadingDraft) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
@@ -126,11 +140,29 @@ export default function GpuClusterNewPage() {
     switch (step) {
       case 0: return (
         <div className="grid sm:grid-cols-2 gap-4">
-          <Input label="Vendor Name *" name="vendorName" value={s1.vendorName} onChange={f(setS1)} />
-          <Input label="Location *" name="location" value={s1.location} onChange={f(setS1)} />
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <label className="text-sm font-medium">Vendor Name *</label>
+              <InfoIcon text="The vendor or company providing this GPU cluster. Used for duplicate detection." placement="top" />
+            </div>
+            <Input name="vendorName" value={s1.vendorName} onChange={f(setS1)} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <label className="text-sm font-medium">Location *</label>
+              <InfoIcon text="City or region where the cluster is located. Used for duplicate detection." placement="top" />
+            </div>
+            <Input name="location" value={s1.location} onChange={f(setS1)} />
+          </div>
           <Input label="Country *" name="country" value={s1.country} onChange={f(setS1)} />
           <Input label="GPU Technology *" name="gpuTechnology" value={s1.gpuTechnology} onChange={f(setS1)} />
-          <LocationInput label="Google Maps Link *" name="googleMapsLink" value={s1.googleMapsLink} onChange={f(setS1)} />
+          <div className="sm:col-span-2">
+            <div className="flex items-center gap-2 mb-2">
+              <label className="text-sm font-medium">Google Maps Link *</label>
+              <InfoIcon text="Precise location coordinates for GPS-based duplicate detection (50-100m radius)." placement="top" />
+            </div>
+            <LocationInput name="googleMapsLink" value={s1.googleMapsLink} onChange={f(setS1)} />
+          </div>
           <Input label="DC Landlord" name="dcLandlord" value={s1.dcLandlord} onChange={f(setS1)} />
           <Input label="Total GPU Count" name="totalGpuCount" type="number" value={s1.totalGpuCount} onChange={f(setS1)} />
           <Input label="Single Cluster Size (GPUs) *" name="singleClusterSize" type="number" value={s1.singleClusterSize} onChange={f(setS1)} />
@@ -143,7 +175,13 @@ export default function GpuClusterNewPage() {
         <div className="grid sm:grid-cols-2 gap-4">
           <Input label="GPU Server Model *" name="gpuServerModel" value={s2.gpuServerModel} onChange={f(setS2)} />
           <Input label="CPU" name="cpu" value={s2.cpu} onChange={f(setS2)} />
-          <Input label="GPU" name="gpu" value={s2.gpu} onChange={f(setS2)} />
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <label className="text-sm font-medium">GPU</label>
+              <InfoIcon text="GPU model/type (e.g., A100, H100). Used for duplicate detection." placement="top" />
+            </div>
+            <Input name="gpu" value={s2.gpu} onChange={f(setS2)} />
+          </div>
           <Input label="RAM" name="ram" value={s2.ram} onChange={f(setS2)} />
           <Input label="Local Storage *" name="localStorage" value={s2.localStorage} onChange={f(setS2)} />
           <Input label="NICs" name="nics" value={s2.nics} onChange={f(setS2)} />
@@ -228,6 +266,14 @@ export default function GpuClusterNewPage() {
           <Button onClick={submit} loading={submitting} disabled={!clusterId}>Submit Listing</Button>
         )}
       </div>
+
+      <DuplicateWarningModal
+        open={duplicateModal.open}
+        onClose={() => setDuplicateModal({ open: false, duplicates: [], hasDuplicates: false })}
+        duplicates={duplicateModal.duplicates}
+        onContinue={handleContinueWithDuplicates}
+        loading={submitting}
+      />
     </div>
   );
 }
