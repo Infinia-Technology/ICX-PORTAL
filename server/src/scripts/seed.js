@@ -18,15 +18,15 @@ function resolveOrgType(vendorType) {
 
 // --- Configurable seed emails ---
 const SEED_EMAILS = {
-  superadmin: process.env.SEED_SUPERADMIN_EMAIL || 'deepanshu.gupta@netgroup.ai',
-  admin:      process.env.SEED_ADMIN_EMAIL      || 'Aastha.Pradhan@apeiro.digital',
-  supplier:   process.env.SEED_SUPPLIER_EMAIL    || 'aastharani07@gmail.com',
-  broker:     process.env.SEED_BROKER_EMAIL      || 'broker@test.com',
-  customer:   process.env.SEED_CUSTOMER_EMAIL    || 'Support@iamsaif.ai',
-  reader:     process.env.SEED_READER_EMAIL      || 'reader@test.com',
-  viewer:     process.env.SEED_VIEWER_EMAIL      || 'viewer@test.com',
-  subordinate:process.env.SEED_SUBORDINATE_EMAIL || 'subordinate@test.com',
-  pending:    process.env.SEED_PENDING_EMAIL     || 'pending@test.com',
+  superadmin: (process.env.SEED_SUPERADMIN_EMAIL || 'deepanshu.gupta@netgroup.ai').toLowerCase(),
+  admin:      (process.env.SEED_ADMIN_EMAIL      || 'aastha.pradhan@apeiro.digital').toLowerCase(),
+  supplier:   (process.env.SEED_SUPPLIER_EMAIL    || 'aastharani07@gmail.com').toLowerCase(),
+  broker:     (process.env.SEED_BROKER_EMAIL      || 'broker@test.com').toLowerCase(),
+  customer:   (process.env.SEED_CUSTOMER_EMAIL    || 'support@iamsaif.ai').toLowerCase(),
+  reader:     (process.env.SEED_READER_EMAIL      || 'reader@test.com').toLowerCase(),
+  viewer:     (process.env.SEED_VIEWER_EMAIL      || 'viewer@test.com').toLowerCase(),
+  subordinate:(process.env.SEED_SUBORDINATE_EMAIL || 'subordinate@test.com').toLowerCase(),
+  pending:    (process.env.SEED_PENDING_EMAIL     || 'pending@test.com').toLowerCase(),
 };
 
 // --- Configurable vendor types ---

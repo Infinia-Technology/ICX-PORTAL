@@ -6,7 +6,7 @@ metadata:
   annotations:
     # Bump this value to re-run the seed (e.g. run-2, run-3)
     # kubectl apply -f k8s/jobs/seed-job.yaml after editing
-    seed-run: "run-2"
+    seed-run: "run-3"
 spec:
   # Do not retry on failure — seed failures should be investigated manually
   backoffLimit: 0
