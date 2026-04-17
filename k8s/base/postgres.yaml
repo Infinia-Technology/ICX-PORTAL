@@ -33,7 +33,7 @@ spec:
             - containerPort: 5432
           env:
             - name: POSTGRES_DB
-              value: icx
+              value: icx_portal
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
@@ -51,14 +51,14 @@ spec:
               mountPath: /var/lib/postgresql/data
           livenessProbe:
             exec:
-              command: ["pg_isready", "-U", "$(POSTGRES_USER)", "-d", "icx"]
+              command: ["pg_isready", "-U", "$(POSTGRES_USER)", "-d", "icx_portal"]
             initialDelaySeconds: 30
             periodSeconds: 30
             timeoutSeconds: 10
             failureThreshold: 3
           readinessProbe:
             exec:
-              command: ["pg_isready", "-U", "$(POSTGRES_USER)", "-d", "icx"]
+              command: ["pg_isready", "-U", "$(POSTGRES_USER)", "-d", "icx_portal"]
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
