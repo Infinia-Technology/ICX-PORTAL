@@ -32,21 +32,6 @@ spec:
                 name: icx-portal-config   # non-secret env vars
             - secretRef:
                 name: icx-portal-secret   # created by vault-secrets CSI volume mount below
-          livenessProbe:
-            httpGet:
-              path: /api/health
-              port: 5000
-            initialDelaySeconds: 30
-            periodSeconds: 15
-            timeoutSeconds: 10
-            failureThreshold: 3
-          readinessProbe:
-            httpGet:
-              path: /api/health
-              port: 5000
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            timeoutSeconds: 5
           volumeMounts:
             - name: vault-secrets
               mountPath: /mnt/vault-secrets
