@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://github.com/Infinia-Technology/ICX-PORTAL
     targetRevision: main
-    path: icx-portal/k8s/overlays/prod
+    path: k8s/overlays/prod
   destination:
     server: https://kubernetes.default.svc   # prod cluster (in-cluster)
     namespace: icx-portal

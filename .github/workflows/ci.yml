@@ -46,7 +46,7 @@ jobs:
       - name: Build and push client
         uses: docker/build-push-action@v6
         with:
-          context: ./icx-portal/client
+          context: ./client
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -87,7 +87,7 @@ jobs:
       - name: Build and push server
         uses: docker/build-push-action@v6
         with:
-          context: ./icx-portal/server
+          context: ./server
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -109,14 +109,14 @@ jobs:
         env:
           TAG: ${{ needs.build-client.outputs.image_tag }}
         run: |
-          sed -i "s|image: ghcr.io/infinia-technology/icx-portal-client:.*|image: ghcr.io/infinia-technology/icx-portal-client:${TAG}|g" icx-portal/k8s/base/client.yaml
-          sed -i "s|image: ghcr.io/infinia-technology/icx-portal-server:.*|image: ghcr.io/infinia-technology/icx-portal-server:${TAG}|g" icx-portal/k8s/base/server.yaml
-          sed -i "s|image: ghcr.io/infinia-technology/icx-portal-server:.*|image: ghcr.io/infinia-technology/icx-portal-server:${TAG}|g" icx-portal/k8s/jobs/seed-job.yaml
+          sed -i "s|image: ghcr.io/infinia-technology/icx-portal-client:.*|image: ghcr.io/infinia-technology/icx-portal-client:${TAG}|g" k8s/base/client.yaml
+          sed -i "s|image: ghcr.io/infinia-technology/icx-portal-server:.*|image: ghcr.io/infinia-technology/icx-portal-server:${TAG}|g" k8s/base/server.yaml
+          sed -i "s|image: ghcr.io/infinia-technology/icx-portal-server:.*|image: ghcr.io/infinia-technology/icx-portal-server:${TAG}|g" k8s/jobs/seed-job.yaml
 
       - name: Commit and push manifest changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add icx-portal/k8s/base/client.yaml icx-portal/k8s/base/server.yaml icx-portal/k8s/jobs/seed-job.yaml
+          git add k8s/base/client.yaml k8s/base/server.yaml k8s/jobs/seed-job.yaml
           git diff --staged --quiet || git commit -m "chore: update image tags to ${{ needs.build-client.outputs.image_tag }} [skip ci]"
           git push
