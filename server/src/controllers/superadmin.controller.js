@@ -40,7 +40,13 @@ const getUsers = async (req, res, next) => {
     });
     
     // Compatibility mapping
-    result.data = result.data.map(u => ({ ...u, _id: u.id, organizationId: u.organization }));
+    result.data = result.data.map(u => ({
+      ...u,
+      _id: u.id,
+      organizationId: u.organization,
+      createdAt: u.created_at,
+      lastLoginAt: u.last_login_at,
+    }));
     
     res.json(result);
   } catch (err) { next(err); }

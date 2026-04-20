@@ -74,7 +74,7 @@ export default function UsersPage() {
     { key: 'role', label: 'Role', render: (v) => <Badge variant={ROLE_VARIANT[v] || 'default'}>{v}</Badge> },
     { key: 'isActive', label: 'Status', render: (v) => <Badge variant={v ? 'success' : 'error'}>{v ? 'Active' : 'Inactive'}</Badge> },
     { key: 'lastLoginAt', label: 'Last Login', render: (v) => v ? new Date(v).toLocaleDateString() : 'Never' },
-    { key: 'createdAt', label: 'Created', render: (v) => new Date(v).toLocaleDateString() },
+    { key: 'createdAt', label: 'Created', render: (v) => v ? new Date(v).toLocaleDateString() : '—' },
     {
       key: '_id', label: 'Actions', render: (v, row) => (
         <div className="flex gap-2">

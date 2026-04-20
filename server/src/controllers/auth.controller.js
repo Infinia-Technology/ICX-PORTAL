@@ -121,7 +121,7 @@ const verifyOtpHandler = async (req, res, next) => {
     // Existing user — issue JWT with organization_id
     user = await prisma.user.update({
       where: { id: user.id },
-      data: { updated_at: new Date() }
+      data: { updated_at: new Date(), last_login_at: new Date() }
     });
 
     const token = signToken({
