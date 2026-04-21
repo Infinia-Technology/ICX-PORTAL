@@ -50,6 +50,9 @@ const listApplications = async (req, res, next) => {
 // POST /api/dc-applications
 const createApplication = async (req, res, next) => {
   try {
+    if (!req.user.organization_id) {
+      return res.status(403).json({ error: 'Your account is not linked to an organization. Please complete registration first.' });
+    }
     const { dataCenterName, ...rest } = req.body;
     const listing = await prisma.listing.create({
       data: {

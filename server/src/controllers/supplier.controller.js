@@ -88,9 +88,12 @@ const getTeam = async (req, res, next) => {
 // POST /api/supplier/team/invite
 const inviteTeamMember = async (req, res, next) => {
   try {
+    const TEAM_ROLES = ['subordinate', 'viewer'];
     const schema = z.object({
-      email: z.string().email().trim().toLowerCase(),
-      role: z.string().default('subordinate'),
+      email: z.string().email('Invalid email address').trim().toLowerCase(),
+      role: z.enum(['subordinate', 'viewer'], {
+        errorMap: () => ({ message: `Team member role must be one of: ${TEAM_ROLES.join(', ')}` }),
+      }).default('subordinate'),
     });
     const { email, role } = schema.parse(req.body);
 
@@ -135,10 +138,12 @@ const inviteTeamMember = async (req, res, next) => {
         </div>
       `).catch(console.error);
     } else {
-      // Existing user — link them directly and mark accepted
+      // Existing user — only downgrade to team-level role, never elevate privileges
+      const TEAM_ROLES = ['subordinate', 'viewer'];
+      const safeRole = TEAM_ROLES.includes(role) ? role : 'subordinate';
       await prisma.user.update({
         where: { id: existingUser.id },
-        data: { organization_id: req.user.organization_id, role: role }
+        data: { organization_id: req.user.organization_id, role: safeRole }
       });
       await prisma.teamInvite.update({
         where: { id: invite.id },

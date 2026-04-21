@@ -9,6 +9,7 @@ import Input from '../../components/ui/Input';
 import Spinner from '../../components/ui/Spinner';
 import { useToast } from '../../components/ui/Toast';
 import { LocationLink } from '../../components/ui/LocationInput';
+import ListingMembersPanel from '../../components/ui/ListingMembersPanel';
 
 const STATUS_VARIANT = { DRAFT: 'default', SUBMITTED: 'info', IN_REVIEW: 'warning', REVISION_REQUESTED: 'warning', RESUBMITTED: 'warning', APPROVED: 'success', REJECTED: 'error' };
 
@@ -214,6 +215,12 @@ export default function GpuClusterReviewPage() {
           </div>
         </Card>
       )}
+
+      {/* ── Team Members Panel ── */}
+      <ListingMembersPanel
+        listingId={id}
+        listingName={c.vendorName || 'GPU Cluster'}
+      />
     </div>
   );
 }

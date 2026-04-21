@@ -52,14 +52,21 @@ const getUsers = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const VALID_ROLES = ['superadmin', 'admin', 'supplier', 'broker', 'customer', 'reader', 'viewer', 'subordinate'];
+
 // POST /api/superadmin/users
 const createUser = async (req, res, next) => {
   try {
     const schema = z.object({
-      email: z.string().email().trim().toLowerCase(),
-      role: z.string(),
+      email: z.string().email('Invalid email address').trim().toLowerCase(),
+      role: z.enum(VALID_ROLES, { errorMap: () => ({ message: `Role must be one of: ${VALID_ROLES.join(', ')}` }) }),
     });
     const { email, role } = schema.parse(req.body);
+
+    // Only superadmin can assign the superadmin role (belt-and-suspenders guard)
+    if (role === 'superadmin' && req.user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Only a Super Admin can assign the Super Admin role' });
+    }
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return res.status(409).json({ error: 'User already exists' });
@@ -77,10 +84,15 @@ const createUser = async (req, res, next) => {
 const updateUser = async (req, res, next) => {
   try {
     const schema = z.object({
-      role: z.string().optional(),
+      role: z.enum(VALID_ROLES).optional(),
       isActive: z.boolean().optional(),
     });
     const changes = schema.parse(req.body);
+
+    // Only superadmin can assign the superadmin role
+    if (changes.role === 'superadmin' && req.user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Only a Super Admin can assign the Super Admin role' });
+    }
 
     const user = await prisma.user.update({
       where: { id: req.params.id },

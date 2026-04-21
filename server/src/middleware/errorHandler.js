@@ -1,13 +1,7 @@
 const errorHandler = (err, req, res, next) => {
   console.error(err.stack);
 
-  if (err.name === 'ValidationError') {
-    return res.status(400).json({
-      error: 'Validation Error',
-      details: Object.values(err.errors).map(e => e.message),
-    });
-  }
-
+  // Zod validation errors
   if (err.name === 'ZodError') {
     return res.status(400).json({
       error: 'Validation Error',
@@ -15,9 +9,25 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
-  if (err.code === 11000) {
-    const field = Object.keys(err.keyPattern)[0];
-    return res.status(409).json({ error: `Duplicate value for ${field}` });
+  // Prisma unique constraint violation (P2002)
+  if (err.code === 'P2002') {
+    const field = err.meta?.target ? [].concat(err.meta.target).join(', ') : 'field';
+    return res.status(409).json({ error: `A record with that ${field} already exists` });
+  }
+
+  // Prisma record not found (P2025)
+  if (err.code === 'P2025') {
+    return res.status(404).json({ error: err.meta?.cause || 'Record not found' });
+  }
+
+  // Prisma foreign key constraint failure (P2003)
+  if (err.code === 'P2003') {
+    return res.status(400).json({ error: 'Related record not found' });
+  }
+
+  // Prisma required field missing (P2012)
+  if (err.code === 'P2012') {
+    return res.status(400).json({ error: 'Missing required field' });
   }
 
   res.status(err.status || 500).json({

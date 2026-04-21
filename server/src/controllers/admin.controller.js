@@ -1,3 +1,4 @@
+const { z } = require('zod');
 const prisma = require('../config/prisma');
 const { logAction } = require('../services/audit.service');
 const { sendEmail } = require('../services/email.service');
@@ -530,6 +531,115 @@ const getAnalytics = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// ======================= ADMIN USER MANAGEMENT =======================
+
+// Roles admin is allowed to create/manage (not superadmin, not admin)
+const ADMIN_MANAGEABLE_ROLES = ['supplier', 'broker', 'customer', 'reader', 'viewer', 'subordinate'];
+
+// GET /admin/manage-users
+const getAdminUsers = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 20, role, search } = req.query;
+    const where = { role: { in: ADMIN_MANAGEABLE_ROLES } };
+    if (role && ADMIN_MANAGEABLE_ROLES.includes(role)) where.role = role;
+    if (search) where.email = { contains: search, mode: 'insensitive' };
+
+    const result = await paginatePrisma(prisma.user, where, page, limit, {
+      organization: { select: { company_name: true, type: true, status: true } }
+    });
+
+    result.data = result.data.map(u => ({
+      ...u,
+      _id: u.id,
+      createdAt: u.created_at,
+      lastLoginAt: u.last_login_at,
+    }));
+
+    res.json(result);
+  } catch (err) { next(err); }
+};
+
+// POST /admin/manage-users
+const createAdminUser = async (req, res, next) => {
+  try {
+    const schema = z.object({
+      name: z.string().trim().optional(),
+      email: z.string().email('Invalid email address').trim().toLowerCase(),
+      role: z.enum(ADMIN_MANAGEABLE_ROLES, {
+        errorMap: () => ({ message: `Admins can only assign: ${ADMIN_MANAGEABLE_ROLES.join(', ')}` }),
+      }),
+    });
+    const { name, email, role } = schema.parse(req.body);
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) return res.status(409).json({ error: 'A user with this email already exists' });
+
+    const user = await prisma.user.create({ data: { name: name || null, email, role } });
+
+    // Notify the new user by email (fire-and-forget — don't fail the request if email fails)
+    sendEmail(
+      email,
+      'Welcome to Compute Exchange',
+      `<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;">
+        <h2 style="color:#1a1a2e;">Compute Exchange</h2>
+        <p>Hello${name ? ` ${name}` : ''},</p>
+        <p>An account has been created for you with the role <strong>${role}</strong>.</p>
+        <p>You can log in using your email address.</p>
+        <a href="${process.env.CLIENT_URL}/login" style="display:inline-block;padding:12px 24px;background:#1a1a2e;color:#fff;text-decoration:none;border-radius:6px;margin-top:16px;">Log in to Portal</a>
+      </div>`
+    ).catch(console.error);
+
+    await logAction({
+      userId: req.user.userId,
+      action: 'ADMIN_CREATE_USER',
+      targetModel: 'User',
+      targetId: user.id,
+      changes: { email, role },
+      ipAddress: req.ip,
+    });
+
+    res.status(201).json({ ...user, _id: user.id });
+  } catch (err) { next(err); }
+};
+
+// PUT /admin/manage-users/:id  (toggle active only — admins cannot change roles)
+const toggleAdminUser = async (req, res, next) => {
+  try {
+    const target = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!target) return res.status(404).json({ error: 'User not found' });
+    if (!ADMIN_MANAGEABLE_ROLES.includes(target.role)) {
+      return res.status(403).json({ error: 'You cannot modify a superadmin or admin account' });
+    }
+
+    const user = await prisma.user.update({
+      where: { id: req.params.id },
+      data: { isActive: req.body.isActive },
+    });
+
+    await logAction({ userId: req.user.userId, action: 'ADMIN_TOGGLE_USER', targetModel: 'User', targetId: user.id, changes: { isActive: req.body.isActive }, ipAddress: req.ip });
+    res.json({ ...user, _id: user.id });
+  } catch (err) { next(err); }
+};
+
+// DELETE /admin/manage-users/:id
+const deleteAdminUser = async (req, res, next) => {
+  try {
+    if (req.params.id === req.user.userId) {
+      return res.status(400).json({ error: 'You cannot delete your own account' });
+    }
+    const target = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!target) return res.status(404).json({ error: 'User not found' });
+    if (!ADMIN_MANAGEABLE_ROLES.includes(target.role)) {
+      return res.status(403).json({ error: 'You cannot delete a superadmin or admin account' });
+    }
+
+    await prisma.user.delete({ where: { id: req.params.id } });
+
+    await logAction({ userId: req.user.userId, action: 'ADMIN_DELETE_USER', changes: { userId: req.params.id, email: target.email }, ipAddress: req.ip });
+    res.json({ message: 'User deleted' });
+  } catch (err) { next(err); }
+};
+
 // ======================= READERS =======================
 
 const getReaders = async (req, res, next) => {
@@ -652,6 +762,7 @@ module.exports = {
   getAdminDcRequests: getAdminInquiries('DC_REQUEST'), getAdminDcRequest: getAdminInquiry, matchDcRequest: matchInquiry,
   updateDocumentStatus,
   getAnalytics,
-  getReaders, createReader, getReader, updateReader, deleteReader, resendReaderWelcome
+  getReaders, createReader, getReader, updateReader, deleteReader, resendReaderWelcome,
+  getAdminUsers, createAdminUser, toggleAdminUser, deleteAdminUser,
 };
 

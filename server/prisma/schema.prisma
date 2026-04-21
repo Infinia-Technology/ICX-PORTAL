@@ -130,6 +130,7 @@ model User {
   inquiries        Inquiry[]
   archives_sent     Archive[]        @relation("ArchivedBy")
   archives_restored Archive[]        @relation("RestoredBy")
+  listing_memberships ListingMember[]
 
   @@index([organization_id])
 }
@@ -161,9 +162,10 @@ model Listing {
   created_at        DateTime      @default(now())
   updated_at        DateTime      @updatedAt
 
-  reservations Reservation[]
-  sites        DcSite[]
-  documents    ListingDocument[]
+  reservations    Reservation[]
+  sites           DcSite[]
+  documents       ListingDocument[]
+  listing_members ListingMember[]
 
   @@index([supplier_id])
   @@index([organization_id])
@@ -380,6 +382,22 @@ model Inquiry {
   @@index([user_id])
   @@index([organization_id])
 }
+// Junction table — users assigned to a specific listing (product)
+model ListingMember {
+  id         String   @id @default(uuid()) @db.Uuid
+  listing_id String   @db.Uuid
+  listing    Listing  @relation(fields: [listing_id], references: [id], onDelete: Cascade)
+  user_id    String   @db.Uuid
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  role       String   @default("viewer")   // viewer | collaborator
+  added_by   String?  @db.Uuid
+  created_at DateTime @default(now())
+
+  @@unique([listing_id, user_id])
+  @@index([listing_id])
+  @@index([user_id])
+}
+
 model Archive {
   id              String    @id @default(uuid()) @db.Uuid
   target_model    String    // 'Listing', etc.

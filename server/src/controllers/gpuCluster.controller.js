@@ -54,6 +54,9 @@ const listClusters = async (req, res, next) => {
 // POST /api/gpu-clusters
 const createCluster = async (req, res, next) => {
   try {
+    if (!req.user.organization_id) {
+      return res.status(403).json({ error: 'Your account is not linked to an organization. Please complete registration first.' });
+    }
     const { vendorName, location, country, ...rest } = req.body;
 
     const cluster = await prisma.listing.create({

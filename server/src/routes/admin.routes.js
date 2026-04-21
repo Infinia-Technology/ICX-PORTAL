@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const authenticate = require('../middleware/auth');
 const authorize = require('../middleware/roles');
+const { getMembers, addMember, inviteMember, removeMember, getAssignableUsers } = require('../controllers/listingMember.controller');
+
 const {
   getQueue, getQueueItem,
   getSuppliers, getSupplier, reviewSupplierKyc,
@@ -14,6 +16,7 @@ const {
   updateDocumentStatus,
   getAnalytics,
   getReaders, createReader, getReader, updateReader, deleteReader, resendReaderWelcome,
+  getAdminUsers, createAdminUser, toggleAdminUser, deleteAdminUser,
 } = require('../controllers/admin.controller');
 
 router.use(authenticate);
@@ -57,6 +60,19 @@ router.put('/documents/:docId/status', updateDocumentStatus);
 
 // Analytics
 router.get('/analytics', getAnalytics);
+
+// Listing member management
+router.get('/users/assignable', getAssignableUsers);
+router.get('/listings/:id/members', getMembers);
+router.post('/listings/:id/members', addMember);
+router.post('/listings/:id/invite', inviteMember);
+router.delete('/listings/:id/members/:userId', removeMember);
+
+// Admin user management (supplier, broker, customer, reader, viewer, subordinate only)
+router.get('/manage-users', getAdminUsers);
+router.post('/manage-users', createAdminUser);
+router.put('/manage-users/:id', toggleAdminUser);
+router.delete('/manage-users/:id', deleteAdminUser);
 
 // Readers
 router.get('/readers', getReaders);

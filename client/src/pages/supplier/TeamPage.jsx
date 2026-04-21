@@ -33,7 +33,10 @@ export default function TeamPage() {
   useEffect(load, []);
 
   const invite = async () => {
-    if (!email) return;
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      addToast({ type: 'error', message: 'Please enter a valid email address' });
+      return;
+    }
     setSubmitting(true);
     try {
       await api.post('/supplier/team/invite', { email, role });

@@ -151,11 +151,19 @@ export default function App() {
               <Route path="/admin/dc-requests" element={<AdminDcRequestsPage />} />
               <Route path="/admin/dc-requests/:id" element={<DcRequestDetailPage />} />
               <Route path="/admin/readers" element={<ReadersPage />} />
-              <Route path="/admin/audit-log" element={<AuditLogPage />} />
-              <Route path="/admin/users" element={<UsersPage />} />
               <Route path="/admin/reports" element={<ReportsPage />} />
               <Route path="/admin/archives" element={<AdminArchivePage />} />
               <Route path="/admin/settings" element={<AdminSettingsPage />} />
+            </Route>
+
+            {/* Superadmin-only routes — these call /api/superadmin/* which requires superadmin role */}
+            <Route element={
+              <ProtectedRoute allowedRoles={[ROLES.SUPERADMIN]}>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }>
+              <Route path="/admin/users" element={<UsersPage />} />
+              <Route path="/admin/audit-log" element={<AuditLogPage />} />
             </Route>
 
             {/* Reader routes */}

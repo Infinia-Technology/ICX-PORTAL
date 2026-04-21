@@ -36,6 +36,7 @@ const navConfig = {
   ],
   [ROLES.ADMIN]: [
     { label: 'Admin Workspace', to: '/admin/dashboard', icon: LayoutDashboard },
+    { label: 'Users', to: '/admin/users', icon: Users },
     { label: 'Suppliers', to: '/admin/suppliers', icon: Building2 },
     { section: 'Questionnaires' },
     { label: 'Customers', to: '/admin/customers', icon: Users },
@@ -52,7 +53,7 @@ const navConfig = {
   ],
   [ROLES.SUPERADMIN]: [
     { label: 'Admin Workspace', to: '/admin/dashboard', icon: LayoutDashboard },
-    { label: 'Users', to: '/admin/users', icon: Users },
+    { label: 'All Users', to: '/admin/users', icon: ShieldCheck },
     { label: 'Audit Log', to: '/admin/audit-log', icon: ShieldCheck },
     { label: 'Suppliers', to: '/admin/suppliers', icon: Building2 },
     { section: 'Questionnaires' },
@@ -64,6 +65,7 @@ const navConfig = {
     { label: 'GPU Demands', to: '/admin/gpu-demands', icon: Zap },
     { label: 'DC Requests', to: '/admin/dc-requests', icon: Database },
     { section: null },
+    { label: 'Readers', to: '/admin/readers', icon: Eye },
     { label: 'Archives', to: '/admin/archives', icon: Archive },
     { label: 'Reports', to: '/admin/reports', icon: FileSpreadsheet },
     { label: 'Settings', to: '/admin/settings', icon: Settings },
