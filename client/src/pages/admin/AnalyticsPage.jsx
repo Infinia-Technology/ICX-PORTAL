@@ -50,7 +50,7 @@ export default function AnalyticsPage() {
   const platformData = [
     { name: 'Suppliers', value: stats.totalSuppliers || 0 },
     { name: 'Customers', value: stats.totalCustomers || 0 },
-    { name: 'GPU Demands', value: stats.totalGpuDemands || 0 },
+    { name: 'GPU Requests', value: stats.totalGpuDemands || 0 },
     { name: 'DC Requests', value: stats.totalDcRequests || 0 },
   ];
 
@@ -58,7 +58,7 @@ export default function AnalyticsPage() {
     { name: 'Approved DC', value: stats.approvedDcListings || 0 },
     { name: 'Pending DC', value: stats.pendingDcListings || 0 },
     { name: 'Approved GPU', value: stats.approvedGpuClusters || 0 },
-    { name: 'GPU Demands', value: stats.totalGpuDemands || 0 },
+    { name: 'GPU Requests', value: stats.totalGpuDemands || 0 },
     { name: 'DC Requests', value: stats.totalDcRequests || 0 },
   ];
 
@@ -123,7 +123,7 @@ export default function AnalyticsPage() {
         />
         <StatCard
           icon={Zap}
-          label="GPU Demands"
+          label="GPU Requests"
           value={stats.totalGpuDemands}
           color="text-orange-500"
         />
@@ -214,7 +214,7 @@ export default function AnalyticsPage() {
               { label: 'Pending DC Listings', value: stats.pendingDcListings },
               { label: 'Approved GPU Listings', value: stats.approvedGpuClusters },
               { label: 'Total Approved MW', value: `${stats.totalApprovedMw || 0} MW` },
-              { label: 'GPU Demands', value: stats.totalGpuDemands },
+              { label: 'GPU Requests', value: stats.totalGpuDemands },
               { label: 'DC Requests', value: stats.totalDcRequests },
               { label: 'Pending Queue Items', value: stats.pendingQueue },
             ].map(({ label, value }) => (

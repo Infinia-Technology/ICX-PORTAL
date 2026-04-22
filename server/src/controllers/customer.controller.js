@@ -95,18 +95,13 @@ const getAnalytics = async (req, res, next) => {
     const userId = req.user.userId;
     const [
       totalGpuDemands, newGpuDemands, closedGpuDemands,
-      totalDcRequests, newDcRequests, closedDcRequests,
     ] = await Promise.all([
       prisma.inquiry.count({ where: { user_id: userId, type: 'GPU_DEMAND' } }),
       prisma.inquiry.count({ where: { user_id: userId, type: 'GPU_DEMAND', status: 'NEW' } }),
       prisma.inquiry.count({ where: { user_id: userId, type: 'GPU_DEMAND', status: 'CLOSED' } }),
-      prisma.inquiry.count({ where: { user_id: userId, type: 'DC_REQUEST' } }),
-      prisma.inquiry.count({ where: { user_id: userId, type: 'DC_REQUEST', status: 'NEW' } }),
-      prisma.inquiry.count({ where: { user_id: userId, type: 'DC_REQUEST', status: 'CLOSED' } }),
     ]);
     res.json({
       totalGpuDemands, newGpuDemands, closedGpuDemands,
-      totalDcRequests, newDcRequests, closedDcRequests,
     });
   } catch (err) { next(err); }
 };

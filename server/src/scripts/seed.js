@@ -63,8 +63,6 @@ async function seed() {
       status: 'APPROVED',
       vendor_type: SEED_VENDOR_TYPES.supplier,
       mandate_status: 'Direct',
-      nda_required: false,
-      nda_signed: false,
       contact_email: SEED_EMAILS.supplier,
       contact_number: '+971501234567',
     }
@@ -76,8 +74,6 @@ async function seed() {
       status: 'APPROVED',
       vendor_type: SEED_VENDOR_TYPES.broker,
       mandate_status: 'Non-exclusive',
-      nda_required: true,
-      nda_signed: true,
       contact_email: SEED_EMAILS.broker,
       contact_number: '+971502345678',
     }
@@ -108,8 +104,6 @@ async function seed() {
       status: 'SUBMITTED',
       vendor_type: SEED_VENDOR_TYPES.pending,
       mandate_status: 'Exclusive',
-      nda_required: false,
-      nda_signed: false,
       contact_email: SEED_EMAILS.pending,
     }
   });

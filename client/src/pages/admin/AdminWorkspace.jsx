@@ -100,7 +100,7 @@ export default function AdminWorkspace() {
   const participantsChartData = [
     { name: 'Suppliers', value: stats?.totalSuppliers || 0 },
     { name: 'Customers', value: stats?.totalCustomers || 0 },
-    { name: 'GPU Demands', value: stats?.totalGpuDemands || 0 },
+    { name: 'GPU Requests', value: stats?.totalGpuDemands || 0 },
     { name: 'DC Requests', value: stats?.totalDcRequests || 0 },
   ];
 
@@ -108,7 +108,7 @@ export default function AdminWorkspace() {
     { name: 'Approved DC', value: stats?.approvedDcListings || 0 },
     { name: 'Pending DC', value: stats?.pendingDcListings || 0 },
     { name: 'Approved GPU', value: stats?.approvedGpuClusters || 0 },
-    { name: 'GPU Demands', value: stats?.totalGpuDemands || 0 },
+    { name: 'GPU Requests', value: stats?.totalGpuDemands || 0 },
     { name: 'DC Requests', value: stats?.totalDcRequests || 0 },
   ];
 
@@ -119,7 +119,7 @@ export default function AdminWorkspace() {
     { label: 'Pending DC Listings', value: stats?.pendingDcListings },
     { label: 'Approved GPU Listings', value: stats?.approvedGpuClusters },
     { label: 'Total Approved MW', value: `${stats?.totalApprovedMw || 0} MW` },
-    { label: 'GPU Demands', value: stats?.totalGpuDemands },
+    { label: 'GPU Requests', value: stats?.totalGpuDemands },
     { label: 'DC Requests', value: stats?.totalDcRequests },
     { label: 'Pending Queue Items', value: stats?.pendingQueue },
   ];
@@ -170,7 +170,7 @@ export default function AdminWorkspace() {
             <MetricCard icon={CheckCircle} label="DC Listings (Approved)" value={stats?.approvedDcListings} color="text-blue-500" iconBg="bg-blue-50" to="/admin/dc-listings" />
             <MetricCard icon={Clock} label="DC Listings (Pending)" value={stats?.pendingDcListings} color="text-yellow-500" iconBg="bg-yellow-50" to="/admin/dc-listings" />
             <MetricCard icon={Server} label="GPU Listings (Approved)" value={stats?.approvedGpuClusters} color="text-green-500" iconBg="bg-green-50" to="/admin/gpu-clusters" />
-            <MetricCard icon={Zap} label="GPU Demands" value={stats?.totalGpuDemands} color="text-orange-500" iconBg="bg-orange-50" to="/admin/gpu-demands" />
+            <MetricCard icon={Zap} label="GPU Requests" value={stats?.totalGpuDemands} color="text-orange-500" iconBg="bg-orange-50" to="/admin/gpu-demands" />
           </div>
 
           {/* Review Queue */}
@@ -203,7 +203,7 @@ export default function AdminWorkspace() {
             <MetricCard icon={CheckCircle} label="DC Listings (Approved)" value={stats?.approvedDcListings} color="text-blue-500" iconBg="bg-blue-50" />
             <MetricCard icon={Clock} label="DC Listings (Pending)" value={stats?.pendingDcListings} color="text-yellow-500" iconBg="bg-yellow-50" />
             <MetricCard icon={Server} label="GPU Listings (Approved)" value={stats?.approvedGpuClusters} color="text-green-500" iconBg="bg-green-50" />
-            <MetricCard icon={Zap} label="GPU Demands" value={stats?.totalGpuDemands} color="text-orange-500" iconBg="bg-orange-50" />
+            <MetricCard icon={Zap} label="GPU Requests" value={stats?.totalGpuDemands} color="text-orange-500" iconBg="bg-orange-50" />
           </div>
 
           {/* Charts */}

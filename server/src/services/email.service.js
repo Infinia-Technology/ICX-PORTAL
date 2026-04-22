@@ -1,6 +1,7 @@
 const resend = require('../config/resend');
 
 const EMAIL_FROM = process.env.EMAIL_FROM || 'support@iamsaif.ai';
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
 
 const sendEmail = async (to, subject, html) => {
   const { data, error } = await resend.emails.send({ from: EMAIL_FROM, to, subject, html });
@@ -42,7 +43,7 @@ const sendKycApproved = async (to) => {
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
       <h2 style="color: #1a1a2e;">Compute Exchange</h2>
       <p>Your account has been <strong>approved</strong>. You can now log in and start using the platform.</p>
-      <a href="${process.env.CLIENT_URL}/login" style="display: inline-block; padding: 12px 24px; background: #1a1a2e; color: #fff; text-decoration: none; border-radius: 6px; margin-top: 16px;">Log In</a>
+      <a href="${CLIENT_URL}/login" style="display: inline-block; padding: 12px 24px; background: #1a1a2e; color: #fff; text-decoration: none; border-radius: 6px; margin-top: 16px;">Log In</a>
     </div>
   `);
 };
@@ -65,7 +66,7 @@ const sendRevisionRequested = async (to, flaggedFields) => {
       <h2 style="color: #1a1a2e;">Compute Exchange</h2>
       <p>Your submission requires revisions. Please update the following fields:</p>
       <ul>${fieldList}</ul>
-      <a href="${process.env.CLIENT_URL}/login" style="display: inline-block; padding: 12px 24px; background: #1a1a2e; color: #fff; text-decoration: none; border-radius: 6px; margin-top: 16px;">Log In to Revise</a>
+      <a href="${CLIENT_URL}/login" style="display: inline-block; padding: 12px 24px; background: #1a1a2e; color: #fff; text-decoration: none; border-radius: 6px; margin-top: 16px;">Log In to Revise</a>
     </div>
   `);
 };
@@ -85,6 +86,35 @@ const sendNotificationEmail = async (to, title, message, actionLink) => {
   `);
 };
 
+/**
+ * Notify all admins/superadmins about a platform event.
+ * @param {string[]} adminEmails - Array of admin email addresses
+ * @param {string} subject
+ * @param {string} title
+ * @param {string} message
+ * @param {string} [actionLink]
+ */
+const sendAdminAlert = async (adminEmails, subject, title, message, actionLink) => {
+  if (!adminEmails || adminEmails.length === 0) return;
+  const buttonHtml = actionLink
+    ? `<a href="${actionLink}" style="display: inline-block; padding: 12px 24px; background: #1a1a2e; color: #fff; text-decoration: none; border-radius: 6px; margin-top: 16px;">Review Now</a>`
+    : '';
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+      <h2 style="color: #1a1a2e;">Compute Exchange — Admin Alert</h2>
+      <h3 style="color: #333;">${title}</h3>
+      <p>${message}</p>
+      ${buttonHtml}
+      <p style="color: #999; font-size: 12px; margin-top: 24px;">This is an automated admin notification.</p>
+    </div>
+  `;
+
+  await Promise.all(adminEmails.map(email => sendEmail(email, `Compute Exchange — ${subject}`, html).catch(err => {
+    console.error('[EMAIL] Admin alert failed for:', email, err.message);
+  })));
+};
+
 module.exports = {
   sendOtpEmail,
   sendEmail,
@@ -93,4 +123,5 @@ module.exports = {
   sendKycRejected,
   sendRevisionRequested,
   sendNotificationEmail,
+  sendAdminAlert,
 };

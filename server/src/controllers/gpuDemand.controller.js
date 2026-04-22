@@ -1,6 +1,7 @@
 const prisma = require('../config/prisma');
 const { logAction } = require('../services/audit.service');
 const { createQueueItem } = require('../services/queue.service');
+const { sendAdminAlert } = require('../services/email.service');
 
 // Helper for Prisma pagination
 const paginatePrisma = async (model, where, page, limit, include = null, orderBy = { created_at: 'desc' }) => {
@@ -25,11 +26,20 @@ const paginatePrisma = async (model, where, page, limit, include = null, orderBy
   };
 };
 
+/** Fetch emails of all active admins and superadmins */
+const getAdminEmails = async () => {
+  const admins = await prisma.user.findMany({
+    where: { role: { in: ['admin', 'superadmin'] }, isActive: true },
+    select: { email: true },
+  });
+  return admins.map(a => a.email);
+};
+
 // GET /api/gpu-demands
 const listDemands = async (req, res, next) => {
   try {
     const { page = 1, limit = 20, status } = req.query;
-    const where = { 
+    const where = {
       organization_id: req.user.organization_id,
       type: 'GPU_DEMAND'
     };
@@ -71,9 +81,9 @@ const createDemand = async (req, res, next) => {
 // GET /api/gpu-demands/:id
 const getDemand = async (req, res, next) => {
   try {
-    const demand = await prisma.inquiry.findFirst({ 
-      where: { 
-        id: req.params.id, 
+    const demand = await prisma.inquiry.findFirst({
+      where: {
+        id: req.params.id,
         organization_id: req.user.organization_id,
         type: 'GPU_DEMAND'
       }
@@ -86,9 +96,9 @@ const getDemand = async (req, res, next) => {
 // PUT /api/gpu-demands/:id
 const updateDemand = async (req, res, next) => {
   try {
-    const demand = await prisma.inquiry.findFirst({ 
-      where: { 
-        id: req.params.id, 
+    const demand = await prisma.inquiry.findFirst({
+      where: {
+        id: req.params.id,
         organization_id: req.user.organization_id,
         type: 'GPU_DEMAND'
       }
@@ -110,9 +120,9 @@ const updateDemand = async (req, res, next) => {
 // POST /api/gpu-demands/:id/submit
 const submitDemand = async (req, res, next) => {
   try {
-    const demand = await prisma.inquiry.findFirst({ 
-      where: { 
-        id: req.params.id, 
+    const demand = await prisma.inquiry.findFirst({
+      where: {
+        id: req.params.id,
         organization_id: req.user.organization_id,
         type: 'GPU_DEMAND'
       }
@@ -130,6 +140,22 @@ const submitDemand = async (req, res, next) => {
 
     try { await createQueueItem({ type: 'GPU_DEMAND', referenceId: demand.id, referenceModel: 'Inquiry' }); } catch (qErr) { console.warn('[QUEUE] GPU_DEMAND queue item skipped:', qErr.message); }
     await logAction({ userId: req.user.userId, action: 'SUBMIT_GPU_DEMAND', targetModel: 'Inquiry', targetId: demand.id, ipAddress: req.ip });
+
+    // Notify admins about new GPU demand submission
+    const specs = demand.specifications || {};
+    getAdminEmails().then(adminEmails => {
+      sendAdminAlert(
+        adminEmails,
+        'New GPU Demand Submitted',
+        'New GPU Demand Submitted',
+        `A GPU demand has been submitted by <strong>${req.user.email}</strong>.<br>
+        Customer: ${specs.customerName || 'N/A'}<br>
+        Technology: ${specs.technologyType || 'N/A'}<br>
+        Cluster Size: ${specs.clusterSizeGpus || 'N/A'} GPUs`,
+        `${process.env.CLIENT_URL || ''}/admin/gpu-demands/${demand.id}`
+      ).catch(console.error);
+    }).catch(console.error);
+
     res.json({ message: 'GPU demand submitted', status: updated.status });
   } catch (err) { next(err); }
 };

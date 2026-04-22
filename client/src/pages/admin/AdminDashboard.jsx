@@ -59,7 +59,7 @@ export default function AdminDashboard() {
         <StatCard icon={Building2} label="DC Listings (Approved)" value={stats?.approvedDcListings} color="text-[var(--color-info)]" to="/admin/dc-listings" />
         <StatCard icon={Clock} label="DC Listings (Pending)" value={stats?.pendingDcListings} color="text-yellow-500" to="/admin/dc-listings" />
         <StatCard icon={Server} label="GPU Listings (Approved)" value={stats?.approvedGpuClusters} color="text-[var(--color-success)]" to="/admin/gpu-clusters" />
-        <StatCard icon={Zap} label="GPU Demands" value={stats?.totalGpuDemands} color="text-orange-500" to="/admin/gpu-demands" />
+        <StatCard icon={Zap} label="GPU Requests" value={stats?.totalGpuDemands} color="text-orange-500" to="/admin/gpu-demands" />
       </div>
 
       {/* Recent Queue + Quick Links */}

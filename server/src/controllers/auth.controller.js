@@ -1,7 +1,7 @@
 const { z } = require('zod');
 const prisma = require('../config/prisma');
 const { createOtp, verifyOtp, canResendOtp, RESEND_COOLDOWN_SECONDS } = require('../services/otp.service');
-const { sendOtpEmail, sendRegistrationConfirmation } = require('../services/email.service');
+const { sendOtpEmail, sendRegistrationConfirmation, sendAdminAlert, sendNotificationEmail } = require('../services/email.service');
 const { signToken } = require('../services/jwt.service');
 const { logAction } = require('../services/audit.service');
 
@@ -13,6 +13,7 @@ const otpRequestSchema = z.object({
 const otpVerifySchema = z.object({
   email: z.string().email().trim().toLowerCase(),
   code: z.string().length(6, 'OTP must be 6 digits'),
+  rememberMe: z.boolean().optional().default(false),
 });
 
 const isDev = process.env.NODE_ENV !== 'production';
@@ -31,11 +32,12 @@ function resolveRole(registrationType, vendorType) {
   return registrationType === 'customer' ? 'customer' : 'supplier';
 }
 
-// Validation schemas (Extended)
 const supplierRegisterSchema = z.object({
   email: z.string().email().trim().toLowerCase(),
   name: z.string().optional(),
   vendorType: z.string().optional(),
+  mandateStatus: z.string().optional(),
+  contactNumber: z.string().optional(),
   companyName: z.string().optional(),
 });
 
@@ -44,6 +46,15 @@ const customerRegisterSchema = z.object({
   name: z.string().optional(),
   companyName: z.string().optional(),
 });
+
+/** Fetch emails of all active admins and superadmins */
+const getAdminEmails = async () => {
+  const admins = await prisma.user.findMany({
+    where: { role: { in: ['admin', 'superadmin'] }, isActive: true },
+    select: { email: true },
+  });
+  return admins.map(a => a.email);
+};
 
 // POST /api/auth/otp/request
 const requestOtp = async (req, res, next) => {
@@ -90,7 +101,7 @@ const resendOtp = async (req, res, next) => {
 // POST /api/auth/otp/verify
 const verifyOtpHandler = async (req, res, next) => {
   try {
-    const { email, code } = otpVerifySchema.parse(req.body);
+    const { email, code, rememberMe } = otpVerifySchema.parse(req.body);
 
     const result = await verifyOtp(email, code);
     if (!result.valid) {
@@ -100,7 +111,7 @@ const verifyOtpHandler = async (req, res, next) => {
 
     logAction({ action: 'OTP_VERIFIED', changes: { email }, ipAddress: req.ip }).catch(() => {});
 
-    let user = await prisma.user.findUnique({ 
+    let user = await prisma.user.findUnique({
       where: { email },
       include: { organization: true }
     });
@@ -118,8 +129,8 @@ const verifyOtpHandler = async (req, res, next) => {
       return res.status(403).json({ error: 'Account has been deactivated' });
     }
 
-    // Existing user — issue JWT with organization_id
-    user = await prisma.user.update({
+    // Existing user — issue JWT, respect rememberMe for expiry
+    await prisma.user.update({
       where: { id: user.id },
       data: { updated_at: new Date(), last_login_at: new Date() }
     });
@@ -129,13 +140,32 @@ const verifyOtpHandler = async (req, res, next) => {
       email: user.email,
       role: user.role,
       organization_id: user.organization_id,
-    });
+    }, rememberMe);
 
     await logAction({
       userId: user.id,
       action: 'LOGIN',
       ipAddress: req.ip,
     });
+
+    // Notify admins about user login
+    getAdminEmails().then(adminEmails => {
+      sendAdminAlert(
+        adminEmails,
+        'User Login',
+        'User Login',
+        `User <strong>${user.email}</strong> (${user.role}) has logged in.`,
+        null
+      ).catch(console.error);
+    }).catch(console.error);
+
+    // Notify the user themselves
+    sendNotificationEmail(
+      user.email,
+      'Login Successful',
+      `You have successfully logged in to Compute Exchange. If this wasn't you, please contact our support team immediately.`,
+      null
+    ).catch(console.error);
 
     res.json({
       authenticated: true,
@@ -147,6 +177,7 @@ const verifyOtpHandler = async (req, res, next) => {
         role: user.role,
         kyc_status: user.kyc_status,
         organization_id: user.organization_id,
+        org_status: user.organization?.status || null,
       },
     });
   } catch (err) {
@@ -167,7 +198,6 @@ const registerSupplier = async (req, res, next) => {
     const role = resolveRole('supplier', data.vendorType);
     const orgType = (role === 'broker') ? 'BROKER' : 'SUPPLIER';
 
-    // Atomic transaction for Organization + User
     const result = await prisma.$transaction(async (tx) => {
       const organization = await tx.organization.create({
         data: {
@@ -175,7 +205,9 @@ const registerSupplier = async (req, res, next) => {
           status: 'SUBMITTED',
           contact_email: data.email,
           company_name: data.companyName,
-          vendor_type: data.vendorType
+          vendor_type: data.vendorType,
+          mandate_status: data.mandateStatus,
+          contact_number: data.contactNumber,
         }
       });
 
@@ -207,7 +239,19 @@ const registerSupplier = async (req, res, next) => {
       ipAddress: req.ip,
     });
 
-    await sendRegistrationConfirmation(data.email, result.user.role).catch(console.error);
+    // Email user confirmation
+    sendRegistrationConfirmation(data.email, result.user.role).catch(console.error);
+
+    // Email all admins about new supplier registration
+    getAdminEmails().then(adminEmails => {
+      sendAdminAlert(
+        adminEmails,
+        'New Supplier Registration',
+        'New Supplier Registration',
+        `A new ${result.user.role} has registered: <strong>${data.email}</strong>${data.companyName ? ` (${data.companyName})` : ''}. Please review their KYC submission.`,
+        `${process.env.CLIENT_URL || ''}/admin/suppliers`
+      ).catch(console.error);
+    }).catch(console.error);
 
     res.status(201).json({
       token,
@@ -272,7 +316,19 @@ const registerCustomer = async (req, res, next) => {
       ipAddress: req.ip,
     });
 
-    await sendRegistrationConfirmation(data.email, result.user.role).catch(console.error);
+    // Email user confirmation
+    sendRegistrationConfirmation(data.email, result.user.role).catch(console.error);
+
+    // Email all admins about new customer registration
+    getAdminEmails().then(adminEmails => {
+      sendAdminAlert(
+        adminEmails,
+        'New Customer Registration',
+        'New Customer Registration',
+        `A new customer has registered: <strong>${data.email}</strong>${data.companyName ? ` (${data.companyName})` : ''}. Please review their application.`,
+        `${process.env.CLIENT_URL || ''}/admin/customers`
+      ).catch(console.error);
+    }).catch(console.error);
 
     res.status(201).json({
       token,
@@ -292,7 +348,7 @@ const registerCustomer = async (req, res, next) => {
 // GET /api/auth/me
 const getMe = async (req, res, next) => {
   try {
-    const user = await prisma.user.findUnique({ 
+    const user = await prisma.user.findUnique({
       where: { id: req.user.userId },
       include: { organization: true }
     });

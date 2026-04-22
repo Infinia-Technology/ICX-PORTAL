@@ -35,7 +35,12 @@ export default function SupplierRegisterPage() {
   const handleVerified = (data) => {
     if (data.registered) {
       login(data.token, data.user);
-      navigate('/supplier/dashboard', { replace: true });
+      const pendingOrgStatuses = ['SUBMITTED', 'PENDING', 'REVISION_REQUESTED', 'REJECTED'];
+      if (pendingOrgStatuses.includes(data.user?.org_status)) {
+        navigate('/supplier/kyc-waiting', { replace: true });
+      } else {
+        navigate('/supplier/dashboard', { replace: true });
+      }
       return;
     }
     setEmail(data.email);

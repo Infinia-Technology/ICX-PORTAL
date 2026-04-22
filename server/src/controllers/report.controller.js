@@ -767,6 +767,61 @@ const fetchSuppliers = async (where, { sortBy, sortDirection, page, limit }) => 
   return { data, total };
 };
 
+const fetchGpuDemands = async (where, { sortBy, sortDirection, page, limit }) => {
+  const skip = page && limit ? (page - 1) * limit : undefined;
+  const take = page && limit ? limit : undefined;
+
+  const inquiryWhere = { type: 'GPU_DEMAND' };
+  if (where.status?.in?.length > 0) inquiryWhere.status = { in: where.status.in };
+  if (where.created_at) inquiryWhere.created_at = where.created_at;
+  if (where.updated_at) inquiryWhere.updated_at = where.updated_at;
+
+  const INQUIRY_SORT_MAP = { createdAt: 'created_at', updatedAt: 'updated_at', status: 'status' };
+  const sortCol = INQUIRY_SORT_MAP[sortBy] || 'created_at';
+
+  const [inquiries, total] = await Promise.all([
+    prisma.inquiry.findMany({
+      where: inquiryWhere,
+      orderBy: { [sortCol]: sortDirection || 'desc' },
+      skip,
+      take,
+      include: { organization: { select: { company_name: true } } }
+    }),
+    prisma.inquiry.count({ where: inquiryWhere })
+  ]);
+
+  const data = inquiries.map((inq) => {
+    const s = (inq.specifications && typeof inq.specifications === 'object') ? inq.specifications : {};
+    return {
+      demandId: inq.id,
+      status: inq.status,
+      createdAt: inq.created_at,
+      updatedAt: inq.updated_at,
+      organizationName: inq.organization?.company_name || '',
+      contactName: s.contactName || '',
+      contactEmail: s.contactEmail || '',
+      contactPhone: s.contactPhone || '',
+      customerName: s.customerName || '',
+      customerCountry: s.customerCountry || '',
+      technologyType: s.technologyType || '',
+      clusterSizeGpus: s.clusterSizeGpus ?? '',
+      contractLengthYears: s.contractLengthYears ?? '',
+      timelineGoLive: s.timelineGoLive || '',
+      idealClusterLocation: s.idealClusterLocation || '',
+      exportConstraints: s.exportConstraints || '',
+      connectivityMbps: s.connectivityMbps ?? '',
+      latencyMs: s.latencyMs ?? '',
+      dcTierMinimum: s.dcTierMinimum || '',
+      targetPriceGpuHr: s.targetPriceGpuHr ?? '',
+      decisionMaker: s.decisionMaker || '',
+      procurementStage: s.procurementStage || '',
+      otherComments: s.otherComments || '',
+    };
+  });
+
+  return { data, total };
+};
+
 const fetchAnalytics = async () => {
   const [suppliers, customers, listings] = await Promise.all([
     prisma.organization.count({ where: { type: 'SUPPLIER', status: 'APPROVED' } }),
@@ -997,7 +1052,7 @@ const toDocx = async (data, fields, reportType) => {
 
 // ======================= GENERATE & PREVIEW =======================
 
-const VALID_TYPES = ['DC_LISTINGS', 'GPU_CLUSTERS', 'SUPPLIERS', 'INVENTORY', 'ANALYTICS'];
+const VALID_TYPES = ['GPU_DEMANDS', 'DC_LISTINGS', 'GPU_CLUSTERS', 'SUPPLIERS', 'ANALYTICS'];
 
 // Roles that can see all data (no supplier_id filter applied)
 const ADMIN_ROLES = ['admin', 'superadmin', 'viewer'];
@@ -1011,17 +1066,18 @@ const generateReport = async (req, res, next) => {
     }
 
     const where = buildFilter(filters, reportType);
-    // Only apply supplier scoping for non-admin roles and non-supplier reports
-    if (!ADMIN_ROLES.includes(req.user.role) && reportType !== 'SUPPLIERS' && reportType !== 'ANALYTICS') {
+    // Only apply supplier scoping for non-admin roles and listing-type reports
+    const INQUIRY_TYPES = ['GPU_DEMANDS', 'SUPPLIERS', 'ANALYTICS'];
+    if (!ADMIN_ROLES.includes(req.user.role) && !INQUIRY_TYPES.includes(reportType)) {
       where.supplier_id = req.user.userId;
     }
 
     let result;
     const opts = { sortBy, sortDirection };
 
-    if (reportType === 'DC_LISTINGS') result = await fetchDcListings(where, opts);
+    if (reportType === 'GPU_DEMANDS') result = await fetchGpuDemands(where, opts);
+    else if (reportType === 'DC_LISTINGS') result = await fetchDcListings(where, opts);
     else if (reportType === 'GPU_CLUSTERS') result = await fetchGpuClusters(where, opts);
-    else if (reportType === 'INVENTORY') result = await fetchInventory(where, opts);
     else if (reportType === 'SUPPLIERS') result = await fetchSuppliers(where, opts);
     else result = await fetchAnalytics();
 
@@ -1097,9 +1153,9 @@ const previewReport = async (req, res, next) => {
     let result;
     const opts = { sortBy, sortDirection, page: parseInt(page), limit: parseInt(limit) };
 
-    if (reportType === 'DC_LISTINGS') result = await fetchDcListings(where, opts);
+    if (reportType === 'GPU_DEMANDS') result = await fetchGpuDemands(where, opts);
+    else if (reportType === 'DC_LISTINGS') result = await fetchDcListings(where, opts);
     else if (reportType === 'GPU_CLUSTERS') result = await fetchGpuClusters(where, opts);
-    else if (reportType === 'INVENTORY') result = await fetchInventory(where, opts);
     else if (reportType === 'SUPPLIERS') result = await fetchSuppliers(where, opts);
     else result = await fetchAnalytics();
 

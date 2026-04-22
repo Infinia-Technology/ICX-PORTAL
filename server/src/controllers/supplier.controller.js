@@ -13,7 +13,14 @@ const getProfile = async (req, res, next) => {
       where: { id: req.user.organization_id }
     });
     if (!org) return res.status(404).json({ error: 'Organization not found' });
-    res.json({ ...org, _id: org.id });
+    res.json({
+      ...org,
+      _id: org.id,
+      contactEmail: org.contact_email,
+      contactNumber: org.contact_number,
+      vendorType: org.vendor_type,
+      mandateStatus: org.mandate_status,
+    });
   } catch (err) { next(err); }
 };
 
@@ -34,8 +41,6 @@ const updateProfile = async (req, res, next) => {
     const allowed = {
       vendorType: 'vendor_type',
       mandateStatus: 'mandate_status',
-      ndaRequired: 'nda_required',
-      ndaSigned: 'nda_signed',
       contactEmail: 'contact_email',
       contactNumber: 'contact_number'
     };
@@ -97,15 +102,30 @@ const inviteTeamMember = async (req, res, next) => {
     });
     const { email, role } = schema.parse(req.body);
 
-    if (!req.user.organization_id) return res.status(403).json({ error: 'User not linked to an organization' });
-    
-    const org = await prisma.organization.findUnique({ where: { id: req.user.organization_id } });
+    let orgId = req.user.organization_id;
+
+    // Auto-create org for supplier/broker users who were created without one
+    if (!orgId) {
+      const currentUser = await prisma.user.findUnique({ where: { id: req.user.userId } });
+      const ORG_ROLES = { supplier: 'SUPPLIER', broker: 'BROKER', customer: 'CUSTOMER' };
+      const orgType = ORG_ROLES[currentUser?.role];
+      if (!orgType) {
+        return res.status(403).json({ error: 'User not linked to an organization' });
+      }
+      const newOrg = await prisma.organization.create({
+        data: { type: orgType, status: 'PENDING', contact_email: currentUser.email }
+      });
+      await prisma.user.update({ where: { id: req.user.userId }, data: { organization_id: newOrg.id } });
+      orgId = newOrg.id;
+    }
+
+    const org = await prisma.organization.findUnique({ where: { id: orgId } });
     if (!org) {
       return res.status(404).json({ error: 'Organization not found' });
     }
 
     const existingInvite = await prisma.teamInvite.findFirst({
-      where: { organization_id: req.user.organization_id, email, status: 'PENDING' }
+      where: { organization_id: orgId, email, status: 'PENDING' }
     });
     if (existingInvite) return res.status(409).json({ error: 'Invite already sent to this email' });
 
@@ -115,7 +135,7 @@ const inviteTeamMember = async (req, res, next) => {
 
     const invite = await prisma.teamInvite.create({
       data: {
-        organization_id: req.user.organization_id,
+        organization_id: orgId,
         inviter_id: req.user.userId,
         email,
         role,
@@ -143,7 +163,7 @@ const inviteTeamMember = async (req, res, next) => {
       const safeRole = TEAM_ROLES.includes(role) ? role : 'subordinate';
       await prisma.user.update({
         where: { id: existingUser.id },
-        data: { organization_id: req.user.organization_id, role: safeRole }
+        data: { organization_id: orgId, role: safeRole }
       });
       await prisma.teamInvite.update({
         where: { id: invite.id },

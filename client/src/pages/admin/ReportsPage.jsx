@@ -16,10 +16,10 @@ import { useToast } from '../../components/ui/Toast';
 // ======================= CONSTANTS =======================
 
 const REPORT_TYPES = [
+  { value: 'GPU_DEMANDS', label: 'GPU Requests' },
+  { value: 'SUPPLIERS', label: 'Suppliers' },
   { value: 'DC_LISTINGS', label: 'DC Listings' },
   { value: 'GPU_CLUSTERS', label: 'GPU Listings' },
-  { value: 'INVENTORY', label: 'GPU Requests' },
-  { value: 'SUPPLIERS', label: 'Suppliers' },
 ];
 
 const EXPORT_FORMATS = [
@@ -41,15 +41,42 @@ const DATE_FIELDS = [
 ];
 
 const STATUS_MAP = {
+  GPU_DEMANDS: ['DRAFT', 'SUBMITTED', 'IN_REVIEW', 'MATCHED', 'CLOSED'],
   DC_LISTINGS: ['DRAFT', 'SUBMITTED', 'IN_REVIEW', 'REVISION_REQUESTED', 'RESUBMITTED', 'APPROVED', 'REJECTED'],
   GPU_CLUSTERS: ['DRAFT', 'SUBMITTED', 'IN_REVIEW', 'REVISION_REQUESTED', 'RESUBMITTED', 'APPROVED', 'REJECTED'],
   SUPPLIERS: ['PENDING', 'SUBMITTED', 'APPROVED', 'REJECTED', 'REVISION_REQUESTED'],
-  INVENTORY: ['AVAILABLE', 'RESERVED', 'SOLD', 'ARCHIVED'],
   ANALYTICS: [],
 };
 
 // Field definitions with friendly labels — all selectable fields per report type
 const FIELD_DEFS = {
+  GPU_DEMANDS: [
+    { key: 'demandId', label: 'Demand ID' },
+    { key: 'status', label: 'Status' },
+    { key: 'createdAt', label: 'Created At' },
+    { key: 'updatedAt', label: 'Updated At' },
+    { key: 'organizationName', label: 'Organization' },
+    // Contact
+    { key: 'contactName', label: 'Contact Name' },
+    { key: 'contactEmail', label: 'Contact Email' },
+    { key: 'contactPhone', label: 'Contact Phone' },
+    // Demand Details
+    { key: 'customerName', label: 'Customer Name' },
+    { key: 'customerCountry', label: 'Customer Country' },
+    { key: 'technologyType', label: 'Technology Type' },
+    { key: 'clusterSizeGpus', label: 'Cluster Size (GPUs)' },
+    { key: 'contractLengthYears', label: 'Contract Length (years)' },
+    { key: 'timelineGoLive', label: 'Timeline Go-Live' },
+    { key: 'idealClusterLocation', label: 'Ideal Cluster Location' },
+    { key: 'exportConstraints', label: 'Export Constraints' },
+    { key: 'connectivityMbps', label: 'Connectivity (Mbps)' },
+    { key: 'latencyMs', label: 'Latency (ms)' },
+    { key: 'dcTierMinimum', label: 'DC Tier Minimum' },
+    { key: 'targetPriceGpuHr', label: 'Target Price (USD/GPU/hr)' },
+    { key: 'decisionMaker', label: 'Decision Maker' },
+    { key: 'procurementStage', label: 'Procurement Stage' },
+    { key: 'otherComments', label: 'Other Comments' },
+  ],
   DC_LISTINGS: [
     // Identity & Status
     { key: 'listingId', label: 'Listing ID' },
@@ -301,15 +328,24 @@ const FIELD_DEFS = {
 };
 
 const GROUPABLE_FIELDS = {
+  GPU_DEMANDS: ['status', 'customerCountry', 'technologyType', 'dcTierMinimum', 'procurementStage', 'organizationName'],
   DC_LISTINGS: ['country', 'state', 'status', 'kycStatus', 'supplierName', 'projectType', 'businessModel', 'dcTiering', 'powerSource', 'isArchived'],
   GPU_CLUSTERS: ['country', 'status', 'kycStatus', 'supplierName', 'gpuTechnology', 'restrictedUse', 'redundancy'],
-  INVENTORY: ['status', 'unitType', 'currency', 'supplierName', 'country', 'kycStatus'],
   SUPPLIERS: ['status', 'kycStatus', 'vendorType', 'country', 'mandateStatus'],
   ANALYTICS: [],
 };
 
 // Key columns shown in the preview table (compact report snapshot)
 const PREVIEW_KEY_FIELDS = {
+  GPU_DEMANDS: [
+    { key: 'contactName', label: 'Contact Name' },
+    { key: 'customerName', label: 'Customer Name' },
+    { key: 'customerCountry', label: 'Country' },
+    { key: 'technologyType', label: 'Technology' },
+    { key: 'clusterSizeGpus', label: 'GPUs' },
+    { key: 'status', label: 'Status' },
+    { key: 'createdAt', label: 'Created At' },
+  ],
   DC_LISTINGS: [
     { key: 'dataCenterName', label: 'Data Center Name' },
     { key: 'supplierName', label: 'Supplier Name' },
@@ -361,7 +397,7 @@ export default function ReportsPage() {
   const [loadingTemplates, setLoadingTemplates] = useState(true);
 
   // Report config
-  const [reportType, setReportType] = useState('DC_LISTINGS');
+  const [reportType, setReportType] = useState('GPU_DEMANDS');
   const [selectedFields, setSelectedFields] = useState([]);
   const [exportFormat, setExportFormat] = useState('csv');
   const [sortBy, setSortBy] = useState('createdAt');

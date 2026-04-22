@@ -12,7 +12,7 @@ import { useApi } from '../../hooks/useApi';
 import {
   COMPANY_TYPES, JURISDICTIONS, PRIMARY_USE_CASES,
   LOCATION_PREFERENCES, SOVEREIGNTY_REQS, COMPLIANCE_REQS,
-  BUDGET_RANGES, URGENCY_OPTIONS,
+  URGENCY_OPTIONS,
 } from '../../config/constants';
 
 export default function CustomerRegisterPage() {
@@ -28,9 +28,8 @@ export default function CustomerRegisterPage() {
     companyName: '', companyType: '', jurisdiction: '', industrySector: '',
     taxVatNumber: '', companyAddress: '', website: '',
     authSignatoryName: '', authSignatoryTitle: '',
-    billingContactName: '', billingContactEmail: '',
     primaryUseCases: [], locationPreferences: [], sovereigntyReqs: [],
-    complianceReqs: [], budgetRange: '', urgency: '',
+    complianceReqs: [], urgency: '',
   });
   const [errors, setErrors] = useState({});
 
@@ -38,7 +37,6 @@ export default function CustomerRegisterPage() {
   const handleVerified = (data) => {
     if (data.registered) { login(data.token, data.user); navigate('/customer/dashboard', { replace: true }); return; }
     setEmail(data.email);
-    setForm((f) => ({ ...f, billingContactEmail: data.email }));
     setStep('form');
   };
 
@@ -49,7 +47,7 @@ export default function CustomerRegisterPage() {
 
   const validate = () => {
     const errs = {};
-    const required = ['companyName', 'companyType', 'jurisdiction', 'industrySector', 'taxVatNumber', 'companyAddress', 'authSignatoryName', 'authSignatoryTitle', 'billingContactName', 'billingContactEmail'];
+    const required = ['companyName', 'companyType', 'jurisdiction', 'industrySector', 'companyAddress', 'authSignatoryName', 'authSignatoryTitle'];
     required.forEach((f) => { if (!form[f]) errs[f] = 'Required'; });
     if (!form.primaryUseCases.length) errs.primaryUseCases = 'Select at least one';
     return errs;
@@ -116,28 +114,21 @@ export default function CustomerRegisterPage() {
             <Input label="Industry / Sector" value={form.industrySector} onChange={(e) => updateField('industrySector', e.target.value)} error={errors.industrySector} required />
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
-            <Input label="Tax / VAT Number" value={form.taxVatNumber} onChange={(e) => updateField('taxVatNumber', e.target.value)} error={errors.taxVatNumber} required />
+            <Input label="Name" value={form.authSignatoryName} onChange={(e) => updateField('authSignatoryName', e.target.value)} error={errors.authSignatoryName} required />
+            <Input label="Title" value={form.authSignatoryTitle} onChange={(e) => updateField('authSignatoryTitle', e.target.value)} error={errors.authSignatoryTitle} required />
+          </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Input label="Tax / VAT Number (optional)" value={form.taxVatNumber} onChange={(e) => updateField('taxVatNumber', e.target.value)} error={errors.taxVatNumber} />
             <Input label="Website" type="url" value={form.website} onChange={(e) => updateField('website', e.target.value)} placeholder="https://..." />
           </div>
           <Input label="Company Address" value={form.companyAddress} onChange={(e) => updateField('companyAddress', e.target.value)} error={errors.companyAddress} required />
-          <div className="grid sm:grid-cols-2 gap-4">
-            <Input label="Authorised Signatory Name" value={form.authSignatoryName} onChange={(e) => updateField('authSignatoryName', e.target.value)} error={errors.authSignatoryName} required />
-            <Input label="Authorised Signatory Title" value={form.authSignatoryTitle} onChange={(e) => updateField('authSignatoryTitle', e.target.value)} error={errors.authSignatoryTitle} required />
-          </div>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <Input label="Billing Contact Name" value={form.billingContactName} onChange={(e) => updateField('billingContactName', e.target.value)} error={errors.billingContactName} required />
-            <Input label="Billing Contact Email" type="email" value={form.billingContactEmail} onChange={(e) => updateField('billingContactEmail', e.target.value)} error={errors.billingContactEmail} required />
-          </div>
 
           <Checkbox label="Primary Use Cases" options={PRIMARY_USE_CASES} value={form.primaryUseCases} onChange={(v) => updateField('primaryUseCases', v)} error={errors.primaryUseCases} required />
           <Checkbox label="Location Preferences" options={LOCATION_PREFERENCES} value={form.locationPreferences} onChange={(v) => updateField('locationPreferences', v)} />
           <Checkbox label="Sovereignty Requirements" options={SOVEREIGNTY_REQS} value={form.sovereigntyReqs} onChange={(v) => updateField('sovereigntyReqs', v)} />
           <Checkbox label="Compliance Requirements" options={COMPLIANCE_REQS} value={form.complianceReqs} onChange={(v) => updateField('complianceReqs', v)} />
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            <Select label="Budget Range" options={BUDGET_RANGES} value={form.budgetRange} onChange={(e) => updateField('budgetRange', e.target.value)} />
-            <Select label="Urgency" options={URGENCY_OPTIONS} value={form.urgency} onChange={(e) => updateField('urgency', e.target.value)} />
-          </div>
+          <Select label="Urgency" options={URGENCY_OPTIONS} value={form.urgency} onChange={(e) => updateField('urgency', e.target.value)} />
 
           {errors.submit && <p className="text-sm text-[var(--color-error)] text-center">{errors.submit}</p>}
 

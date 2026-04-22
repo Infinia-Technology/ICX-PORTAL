@@ -9,10 +9,9 @@ const {
   getSuppliers, getSupplier, reviewSupplierKyc,
   getDcListings, getDcListing, reviewDcListing,
   getGpuClusters, getGpuCluster, reviewGpuCluster,
-  getCustomers, getCustomer, verifyCustomer,
+  getCustomers, getCustomer, createCustomer, verifyCustomer,
   createAdminGpuDemand,
   getAdminGpuDemands, getAdminGpuDemand, matchGpuDemand,
-  getAdminDcRequests, getAdminDcRequest, matchDcRequest,
   updateDocumentStatus,
   getAnalytics,
   getReaders, createReader, getReader, updateReader, deleteReader, resendReaderWelcome,
@@ -43,6 +42,7 @@ router.put('/gpu-clusters/:id/review', reviewGpuCluster);
 
 // Customers
 router.get('/customers', getCustomers);
+router.post('/customers', createCustomer);
 router.get('/customers/:id', getCustomer);
 router.put('/customers/:id/verify', verifyCustomer);
 
@@ -51,9 +51,6 @@ router.post('/gpu-demands', createAdminGpuDemand);
 router.get('/gpu-demands', getAdminGpuDemands);
 router.get('/gpu-demands/:id', getAdminGpuDemand);
 router.put('/gpu-demands/:id/match', matchGpuDemand);
-router.get('/dc-requests', getAdminDcRequests);
-router.get('/dc-requests/:id', getAdminDcRequest);
-router.put('/dc-requests/:id/match', matchDcRequest);
 
 // Document tracking
 router.put('/documents/:docId/status', updateDocumentStatus);

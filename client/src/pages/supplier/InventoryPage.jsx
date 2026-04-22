@@ -174,7 +174,7 @@ export default function SupplierInventoryPage() {
     });
   };
 
-  const canEditDelete = (status) => !['RESERVED', 'SOLD'].includes(status);
+  const canEditDelete = (status) => !['SOLD'].includes(status);
 
   const columns = [
     {
@@ -234,9 +234,8 @@ export default function SupplierInventoryPage() {
     },
     {
       key: 'pricePerUnit',
-      label: 'Price',
-      render: (v, row) =>
-        v ? `${row.currency || 'USD'} ${v}/${(row.pricingPeriod || 'MONTH').toLowerCase()}` : '-',
+      label: 'GPU Price/h, USD',
+      render: (v) => v ? v : '-',
     },
     {
       key: 'location',
@@ -404,7 +403,7 @@ export default function SupplierInventoryPage() {
             <div className="p-3 bg-gray-50 rounded">
               <div className="flex items-center gap-2 mb-2">
                 <p className="text-sm font-medium">Status</p>
-                <InfoIcon text="AVAILABLE: All units free | RESERVED: Some units booked | SOLD: All units sold | ARCHIVED: Listing inactive" placement="top" />
+                <InfoIcon text="AVAILABLE: All units free | RESERVED: Some units booked | SOLD: All units sold (cannot delete)" placement="top" />
               </div>
               <Badge status={editing.status} />
             </div>
@@ -441,8 +440,8 @@ export default function SupplierInventoryPage() {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <label className="text-sm font-medium">Price Per Unit</label>
-                <InfoIcon text="Price per unit per the selected pricing period" placement="top" />
+                <label className="text-sm font-medium">GPU Price/h, USD</label>
+                <InfoIcon text="Price per GPU per hour in USD" placement="top" />
               </div>
               <Input
                 type="number"

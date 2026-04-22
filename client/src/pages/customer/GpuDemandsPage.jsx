@@ -19,9 +19,10 @@ export default function GpuDemandsPage() {
   }, []);
 
   const columns = [
+    { key: 'contactName', label: 'Contact' },
     { key: 'customerName', label: 'Customer' },
     { key: 'technologyType', label: 'Technology' },
-    { key: 'clusterSizeGpus', label: 'GPU Count' },
+    { key: 'clusterSizeGpus', label: 'GPUs' },
     { key: 'timelineGoLive', label: 'Timeline' },
     { key: 'status', label: 'Status', render: (v) => <Badge variant={STATUS_VARIANT[v]}>{v}</Badge> },
     { key: 'createdAt', label: 'Created', render: (v) => new Date(v).toLocaleDateString() },
@@ -33,20 +34,20 @@ export default function GpuDemandsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">GPU Demand Requests</h1>
-          <p className="text-[var(--color-text-secondary)] text-sm mt-1">Track your GPU compute demand requests</p>
+          <h1 className="text-2xl font-bold">Listings</h1>
+          <p className="text-[var(--color-text-secondary)] text-sm mt-1">Track your GPU compute demand listings</p>
         </div>
         <Link to="/customer/gpu-demands/new">
-          <Button leftIcon={<Plus className="w-4 h-4" />}>New Demand</Button>
+          <Button leftIcon={<Plus className="w-4 h-4" />}>New Listing</Button>
         </Link>
       </div>
 
       {demands.length === 0 ? (
         <Card className="text-center py-16">
           <Zap className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="font-semibold text-lg mb-2">No GPU demands yet</h3>
+          <h3 className="font-semibold text-lg mb-2">No listings yet</h3>
           <Link to="/customer/gpu-demands/new">
-            <Button leftIcon={<Plus className="w-4 h-4" />}>Submit GPU Demand</Button>
+            <Button leftIcon={<Plus className="w-4 h-4" />}>New Listing</Button>
           </Link>
         </Card>
       ) : <DataTable columns={columns} data={demands} />}

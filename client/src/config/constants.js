@@ -43,8 +43,8 @@ export const RESERVATION_STATUS = {
 };
 
 export const INVENTORY_UNIT_TYPES = ['GPU', 'NODE', 'RACK', 'CLUSTER'];
-export const INVENTORY_PRICING_PERIODS = ['HOUR', 'DAY', 'MONTH', 'YEAR'];
-export const INVENTORY_CURRENCIES = ['USD', 'EUR', 'GBP', 'AED', 'SAR'];
+export const INVENTORY_PRICING_PERIODS = ['HOUR'];
+export const INVENTORY_CURRENCIES = ['USD'];
 
 export const VENDOR_TYPES = ['Operator', 'Developer', 'Landlord', 'Broker', 'Advisor', 'Other Intermediary'];
 export const MANDATE_STATUSES = ['Exclusive', 'Non-exclusive', 'Direct', 'Unknown'];

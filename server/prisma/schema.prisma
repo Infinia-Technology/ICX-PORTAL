@@ -66,8 +66,6 @@ model Organization {
   // KYC / Profile fields
   vendor_type     String?
   mandate_status  String?
-  nda_required    Boolean     @default(false)
-  nda_signed      Boolean     @default(false)
   contact_email   String
   contact_number  String?
   
@@ -125,7 +123,6 @@ model User {
   audit_logs       AuditLog[]
   report_templates ReportTemplate[]
   team_invites     TeamInvite[]     @relation("InvitesSent")
-  received_invites TeamInvite[]     @relation("InvitesReceived")
   assigned_queue   QueueItem[]      @relation("AssignedAdmins")
   inquiries        Inquiry[]
   archives_sent     Archive[]        @relation("ArchivedBy")
@@ -360,8 +357,6 @@ model TeamInvite {
   accepted_at     DateTime?
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
-
-  user            User?    @relation("InvitesReceived", fields: [email], references: [email])
 
   @@index([organization_id])
   @@index([email])

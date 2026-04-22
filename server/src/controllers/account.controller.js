@@ -68,22 +68,17 @@ const exportData = async (req, res, next) => {
       where: { organization_id: organizationId, type: 'GPU_CLUSTER' } 
     });
     
-    const gpuDemands = await prisma.inquiry.findMany({ 
-      where: { organization_id: organizationId, type: 'GPU_DEMAND' } 
-    });
-    
-    const dcRequests = await prisma.inquiry.findMany({ 
-      where: { organization_id: organizationId, type: 'DC_REQUEST' } 
+    const gpuDemands = await prisma.inquiry.findMany({
+      where: { organization_id: organizationId, type: 'GPU_DEMAND' }
     });
 
-    const exportData = { 
-      user, 
-      organization: org, 
-      dcApplications: dcApps, 
-      gpuClusters, 
-      gpuDemands, 
-      dcRequests, 
-      exportedAt: new Date() 
+    const exportData = {
+      user,
+      organization: org,
+      dcApplications: dcApps,
+      gpuClusters,
+      gpuDemands,
+      exportedAt: new Date()
     };
 
     await logAction({ userId: userId, action: 'GDPR_EXPORT', ipAddress: req.ip });

@@ -35,7 +35,7 @@ const PAGE_OVERVIEWS = {
     highlights: ['View available, reserved, and sold units', 'Filter by unit type and status', 'Export inventory reports'],
   },
   '/admin/gpu-demands': {
-    title: 'GPU Demands',
+    title: 'GPU Requests',
     description: 'GPU capacity requests submitted by customers.',
     highlights: ['Review customer requirements', 'Filter by technology and status', 'Match demands to available clusters'],
   },
@@ -119,7 +119,7 @@ const PAGE_OVERVIEWS = {
     highlights: ['Submit new GPU demands or DC requests', 'View open and closed demands', 'Track request activity'],
   },
   '/customer/gpu-demands': {
-    title: 'GPU Demands',
+    title: 'GPU Requests',
     description: 'All your GPU capacity requests submitted to the platform.',
     highlights: ['Submit new GPU demand requests', 'Track status of active demands', 'View demand history'],
   },

@@ -1,7 +1,16 @@
 const { z } = require('zod');
 const prisma = require('../config/prisma');
 const { logAction } = require('../services/audit.service');
-const { sendEmail } = require('../services/email.service');
+const { sendEmail, sendKycApproved, sendKycRejected, sendRevisionRequested, sendAdminAlert } = require('../services/email.service');
+
+/** Fetch emails of all active admins and superadmins */
+const getAdminEmails = async () => {
+  const admins = await prisma.user.findMany({
+    where: { role: { in: ['admin', 'superadmin'] }, isActive: true },
+    select: { email: true },
+  });
+  return admins.map(a => a.email);
+};
 
 // Helper for Prisma pagination
 const paginatePrisma = async (model, where, page, limit, include = null, orderBy = { created_at: 'desc' }) => {
@@ -230,7 +239,27 @@ const reviewSupplierKyc = async (req, res, next) => {
           link: '/supplier/dashboard'
         }
       });
+
+      // Send email to the user
+      if (action === 'APPROVE') {
+        sendKycApproved(user.email).catch(console.error);
+      } else if (action === 'REJECT') {
+        sendKycRejected(user.email, reason).catch(console.error);
+      } else if (action === 'REQUEST_REVISION' && flaggedFields.length > 0) {
+        sendRevisionRequested(user.email, flaggedFields).catch(console.error);
+      }
     }
+
+    // Notify admins
+    getAdminEmails().then(adminEmails => {
+      sendAdminAlert(
+        adminEmails,
+        `KYC ${action}`,
+        `KYC ${action.replace('_', ' ')}`,
+        `KYC for organization <strong>${org.company_name || org.id}</strong> has been ${action.toLowerCase().replace('_', ' ')}.`,
+        `${process.env.CLIENT_URL || ''}/admin/suppliers/${org.id}`
+      ).catch(console.error);
+    }).catch(console.error);
 
     await logAction({ userId: req.user.userId, action: `KYC_${action}`, targetModel: 'Organization', targetId: org.id });
     res.json({ message: `KYC ${action.toLowerCase()} successfully`, status: updated.status });
@@ -397,6 +426,73 @@ const getCustomer = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// POST /api/admin/customers
+const createCustomer = async (req, res, next) => {
+  try {
+    const schema = z.object({
+      email: z.string().email('Invalid email address').trim().toLowerCase(),
+      companyName: z.string().trim().min(1, 'Company name is required'),
+      companyType: z.string().optional(),
+      jurisdiction: z.string().optional(),
+      industrySector: z.string().optional(),
+      companyAddress: z.string().optional(),
+      authSignatoryName: z.string().optional(),
+      authSignatoryTitle: z.string().optional(),
+      taxVatNumber: z.string().optional(),
+      primaryUseCases: z.array(z.string()).optional(),
+    });
+
+    const data = schema.parse(req.body);
+
+    // Check if user with email already exists
+    const existing = await prisma.user.findUnique({ where: { email: data.email } });
+    if (existing) return res.status(409).json({ error: 'A user with this email already exists' });
+
+    // Create org + user in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      const org = await tx.organization.create({
+        data: {
+          type: 'CUSTOMER',
+          status: 'APPROVED',
+          company_name: data.companyName,
+          company_type: data.companyType || null,
+          jurisdiction: data.jurisdiction || null,
+          industry_sector: data.industrySector || null,
+          company_address: data.companyAddress || null,
+          auth_signatory_name: data.authSignatoryName || null,
+          auth_signatory_title: data.authSignatoryTitle || null,
+          tax_vat_number: data.taxVatNumber || null,
+          contact_email: data.email,
+          primary_use_cases: data.primaryUseCases || [],
+        },
+      });
+
+      const user = await tx.user.create({
+        data: {
+          email: data.email,
+          role: 'customer',
+          organization_id: org.id,
+          name: data.authSignatoryName || null,
+        },
+      });
+
+      return { org, user };
+    });
+
+    await logAction({ userId: req.user.userId, action: 'CREATE_CUSTOMER', targetModel: 'Organization', targetId: result.org.id, ipAddress: req.ip });
+
+    res.status(201).json({
+      _id: result.org.id,
+      companyName: result.org.company_name,
+      contactEmail: result.org.contact_email,
+      status: result.org.status,
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors[0].message });
+    next(err);
+  }
+};
+
 // PUT /api/admin/customers/:id/verify
 const verifyCustomer = async (req, res, next) => {
   try {
@@ -501,7 +597,8 @@ const getAnalytics = async (req, res, next) => {
       pendingQueue,
       totalMw,
       totalGpuDemands,
-      totalDcRequests,
+      submittedGpuDemands,
+      matchedGpuDemands,
     ] = await Promise.all([
       prisma.organization.count({ where: { type: 'SUPPLIER', status: 'APPROVED' } }),
       prisma.organization.count({ where: { type: 'CUSTOMER', status: 'APPROVED' } }),
@@ -514,7 +611,8 @@ const getAnalytics = async (req, res, next) => {
         _sum: { total_mw: true }
       }),
       prisma.inquiry.count({ where: { type: 'GPU_DEMAND' } }),
-      prisma.inquiry.count({ where: { type: 'DC_REQUEST' } }),
+      prisma.inquiry.count({ where: { type: 'GPU_DEMAND', status: 'SUBMITTED' } }),
+      prisma.inquiry.count({ where: { type: 'GPU_DEMAND', status: 'MATCHED' } }),
     ]);
 
     res.json({
@@ -526,7 +624,8 @@ const getAnalytics = async (req, res, next) => {
       pendingQueue,
       totalApprovedMw: totalMw._sum.total_mw || 0,
       totalGpuDemands,
-      totalDcRequests,
+      submittedGpuDemands,
+      matchedGpuDemands,
     });
   } catch (err) { next(err); }
 };
@@ -574,7 +673,27 @@ const createAdminUser = async (req, res, next) => {
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return res.status(409).json({ error: 'A user with this email already exists' });
 
-    const user = await prisma.user.create({ data: { name: name || null, email, role } });
+    // Roles that need an Organization (so team invites, listings, demands all work)
+    const ORG_ROLES = { supplier: 'SUPPLIER', broker: 'BROKER', customer: 'CUSTOMER' };
+    const orgType = ORG_ROLES[role];
+
+    const user = await prisma.$transaction(async (tx) => {
+      let organization_id = null;
+      if (orgType) {
+        const org = await tx.organization.create({
+          data: {
+            type: orgType,
+            status: 'PENDING',
+            contact_email: email,
+            company_name: name || null,
+          }
+        });
+        organization_id = org.id;
+      }
+      return tx.user.create({
+        data: { name: name || null, email, role, organization_id }
+      });
+    });
 
     // Notify the new user by email (fire-and-forget — don't fail the request if email fails)
     sendEmail(
@@ -756,10 +875,9 @@ module.exports = {
   getSuppliers, getSupplier, reviewSupplierKyc,
   getDcListings, getDcListing, reviewDcListing,
   getGpuClusters, getGpuCluster, reviewGpuCluster,
-  getCustomers, getCustomer, verifyCustomer,
+  getCustomers, getCustomer, createCustomer, verifyCustomer,
   createAdminGpuDemand,
   getAdminGpuDemands: getAdminInquiries('GPU_DEMAND'), getAdminGpuDemand: getAdminInquiry, matchGpuDemand: matchInquiry,
-  getAdminDcRequests: getAdminInquiries('DC_REQUEST'), getAdminDcRequest: getAdminInquiry, matchDcRequest: matchInquiry,
   updateDocumentStatus,
   getAnalytics,
   getReaders, createReader, getReader, updateReader, deleteReader, resendReaderWelcome,
