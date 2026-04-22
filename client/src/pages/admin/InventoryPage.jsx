@@ -313,9 +313,8 @@ export default function InventoryPage() {
     },
     {
       key: 'pricePerUnit',
-      label: 'Price',
-      render: (v, row) =>
-        v ? `${row.currency || 'USD'} ${v}/${(row.pricingPeriod || 'MONTH').toLowerCase()}` : '-',
+      label: 'GPU Price/h, USD',
+      render: (v) => v ?? '-',
     },
     {
       key: 'location',

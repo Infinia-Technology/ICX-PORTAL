@@ -78,7 +78,7 @@ export default function SupplierGpuDemandsPage() {
       <div className="mb-6 flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold">GPU Requests</h1>
-          <p className="text-[var(--color-text-secondary)] text-sm mt-1">All GPU demand requests from customers</p>
+          <p className="text-[var(--color-text-secondary)] text-sm mt-1">All GPU requests from customers</p>
         </div>
         <Button onClick={() => setShowModal(true)}>
           <Plus className="w-4 h-4" /> Add GPU Request
