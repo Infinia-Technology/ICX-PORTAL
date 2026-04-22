@@ -30,6 +30,7 @@ import GpuClusterEditPage from './pages/supplier/GpuClusterEditPage';
 import SupplierInventoryPage from './pages/supplier/InventoryPage';
 import TeamPage from './pages/supplier/TeamPage';
 import SupplierGpuDemandNewPage from './pages/supplier/GpuDemandNewPage';
+import SupplierGpuDemandsPage from './pages/supplier/GpuDemandsPage';
 import SupplierSettingsPage from './pages/supplier/SupplierSettingsPage';
 import KycWaitingPage from './pages/supplier/KycWaitingPage';
 
@@ -100,7 +101,7 @@ export default function App() {
               <Route path="/supplier/gpu-clusters/:id/edit" element={<GpuClusterEditPage />} />
               <Route path="/supplier/inventory" element={<SupplierInventoryPage />} />
               <Route path="/supplier/team" element={<TeamPage />} />
-              <Route path="/supplier/gpu-demands" element={<AdminGpuDemandsPage />} />
+              <Route path="/supplier/gpu-demands" element={<SupplierGpuDemandsPage />} />
               <Route path="/supplier/gpu-demands/:id" element={<GpuDemandDetailPage />} />
               <Route path="/supplier/gpu-demands/new" element={<SupplierGpuDemandNewPage />} />
               <Route path="/supplier/settings" element={<SupplierSettingsPage />} />
