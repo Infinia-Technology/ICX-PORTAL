@@ -19,7 +19,7 @@ const REPORT_TYPES = [
   { value: 'GPU_DEMANDS', label: 'GPU Requests' },
   { value: 'SUPPLIERS', label: 'Suppliers' },
   { value: 'DC_LISTINGS', label: 'DC Listings' },
-  { value: 'GPU_CLUSTERS', label: 'GPU Listings' },
+  { value: 'GPU_CLUSTERS', label: 'GPU Capacity Listings' },
 ];
 
 const EXPORT_FORMATS = [
@@ -56,23 +56,25 @@ const FIELD_DEFS = {
     { key: 'createdAt', label: 'Created At' },
     { key: 'updatedAt', label: 'Updated At' },
     { key: 'organizationName', label: 'Organization' },
-    // Contact
-    { key: 'contactName', label: 'Contact Name' },
-    { key: 'contactEmail', label: 'Contact Email' },
-    { key: 'contactPhone', label: 'Contact Phone' },
-    // Demand Details
-    { key: 'customerName', label: 'Customer Name' },
+    // Client Identity
+    { key: 'customer', label: 'Customer' },
+    { key: 'dateOfEntry', label: 'Date of Entry' },
     { key: 'customerCountry', label: 'Customer Country' },
-    { key: 'technologyType', label: 'Technology Type' },
-    { key: 'clusterSizeGpus', label: 'Cluster Size (GPUs)' },
-    { key: 'contractLengthYears', label: 'Contract Length (years)' },
-    { key: 'timelineGoLive', label: 'Timeline Go-Live' },
+    // Technical Requirements
+    { key: 'typeOfTechnology', label: 'Type of Technology' },
+    { key: 'clusterSizeGpu', label: 'Cluster Size GPU #' },
+    { key: 'dcTierMinimum', label: 'DC Tier (minimum)' },
+    { key: 'connectivityMbps', label: 'Connectivity, Mbps' },
+    { key: 'latencyMs', label: 'Latency, ms' },
+    { key: 'interconnectivity', label: 'Interconnectivity' },
+    { key: 'redundancyUptimeRequirements', label: 'Redundancy / Uptime Requirements' },
+    // Deployment
+    { key: 'contractLengthYears', label: 'Contract Length, Years' },
+    { key: 'timelineForGoLive', label: 'Timeline for Go Live' },
     { key: 'idealClusterLocation', label: 'Ideal Cluster Location' },
     { key: 'exportConstraints', label: 'Export Constraints' },
-    { key: 'connectivityMbps', label: 'Connectivity (Mbps)' },
-    { key: 'latencyMs', label: 'Latency (ms)' },
-    { key: 'dcTierMinimum', label: 'DC Tier Minimum' },
-    { key: 'targetPriceGpuHr', label: 'Target Price (USD/GPU/hr)' },
+    // Commercial & CRM
+    { key: 'targetPriceGpuHUsd', label: 'Target Price, GPU/h, USD' },
     { key: 'decisionMaker', label: 'Decision Maker' },
     { key: 'procurementStage', label: 'Procurement Stage' },
     { key: 'otherComments', label: 'Other Comments' },
@@ -311,7 +313,7 @@ const FIELD_DEFS = {
     { key: 'vendorType', label: 'Vendor Type' },
     { key: 'mandateStatus', label: 'Mandate Status' },
     { key: 'dcListingCount', label: 'DC Listings' },
-    { key: 'gpuListingCount', label: 'GPU Listings' },
+    { key: 'gpuListingCount', label: 'GPU Capacity Listings' },
     { key: 'createdAt', label: 'Created At' },
     { key: 'updatedAt', label: 'Updated At' },
     { key: 'approvedAt', label: 'Approved At' },
@@ -328,7 +330,7 @@ const FIELD_DEFS = {
 };
 
 const GROUPABLE_FIELDS = {
-  GPU_DEMANDS: ['status', 'customerCountry', 'technologyType', 'dcTierMinimum', 'procurementStage', 'organizationName'],
+  GPU_DEMANDS: ['status', 'customerCountry', 'typeOfTechnology', 'dcTierMinimum', 'procurementStage', 'organizationName'],
   DC_LISTINGS: ['country', 'state', 'status', 'kycStatus', 'supplierName', 'projectType', 'businessModel', 'dcTiering', 'powerSource', 'isArchived'],
   GPU_CLUSTERS: ['country', 'status', 'kycStatus', 'supplierName', 'gpuTechnology', 'restrictedUse', 'redundancy'],
   SUPPLIERS: ['status', 'kycStatus', 'vendorType', 'country', 'mandateStatus'],
@@ -338,11 +340,11 @@ const GROUPABLE_FIELDS = {
 // Key columns shown in the preview table (compact report snapshot)
 const PREVIEW_KEY_FIELDS = {
   GPU_DEMANDS: [
-    { key: 'contactName', label: 'Contact Name' },
-    { key: 'customerName', label: 'Customer Name' },
+    { key: 'customer', label: 'Customer' },
     { key: 'customerCountry', label: 'Country' },
-    { key: 'technologyType', label: 'Technology' },
-    { key: 'clusterSizeGpus', label: 'GPUs' },
+    { key: 'typeOfTechnology', label: 'Technology' },
+    { key: 'clusterSizeGpu', label: 'Cluster Size GPU #' },
+    { key: 'timelineForGoLive', label: 'Timeline' },
     { key: 'status', label: 'Status' },
     { key: 'createdAt', label: 'Created At' },
   ],

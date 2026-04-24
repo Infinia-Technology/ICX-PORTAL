@@ -149,9 +149,9 @@ const submitDemand = async (req, res, next) => {
         'New GPU Demand Submitted',
         'New GPU Demand Submitted',
         `A GPU demand has been submitted by <strong>${req.user.email}</strong>.<br>
-        Customer: ${specs.customerName || 'N/A'}<br>
-        Technology: ${specs.technologyType || 'N/A'}<br>
-        Cluster Size: ${specs.clusterSizeGpus || 'N/A'} GPUs`,
+        Customer: ${specs.customer || 'N/A'}<br>
+        Technology: ${specs.typeOfTechnology || 'N/A'}<br>
+        Cluster Size: ${specs.clusterSizeGpu || 'N/A'} GPUs`,
         `${process.env.CLIENT_URL || ''}/admin/gpu-demands/${demand.id}`
       ).catch(console.error);
     }).catch(console.error);

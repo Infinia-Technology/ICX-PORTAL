@@ -25,9 +25,9 @@ const PAGE_OVERVIEWS = {
     highlights: ['Filter by status, country, MW', 'Review and approve listings', 'Export listing data'],
   },
   '/admin/gpu-clusters': {
-    title: 'GPU Listings',
-    description: 'All GPU cluster listings submitted by suppliers.',
-    highlights: ['Filter by technology, location, status', 'Review and approve GPU listings', 'Export cluster data'],
+    title: 'GPU Capacity Listings',
+    description: 'All GPU capacity listings submitted by suppliers.',
+    highlights: ['Filter by technology, location, status', 'Review and approve GPU capacity listings', 'Export cluster data'],
   },
   '/admin/inventory': {
     title: 'GPU Requests (Inventory)',
@@ -87,13 +87,13 @@ const PAGE_OVERVIEWS = {
     highlights: ['10 steps: Company Details to Documents', 'Auto-save on each step', 'Submit for admin review when complete'],
   },
   '/supplier/gpu-clusters': {
-    title: 'GPU Listings',
-    description: 'All your GPU cluster listings — drafts, submitted, and approved.',
-    highlights: ['Create new GPU listings', 'Track approval status', 'Edit and resubmit listings'],
+    title: 'GPU Capacity Listings',
+    description: 'All your GPU capacity listings — drafts, submitted, and approved.',
+    highlights: ['Create new GPU capacity listings', 'Track approval status', 'Edit and resubmit listings'],
   },
   '/supplier/gpu-clusters/new': {
-    title: 'New GPU Listing',
-    description: 'Multi-step form to submit a new GPU cluster listing for review.',
+    title: 'New GPU Capacity Listing',
+    description: 'Multi-step form to submit a new GPU capacity listing for review.',
     highlights: ['8 steps: Basic Info to Extended Information', 'Auto-save on each step', 'Submit for admin review when complete'],
   },
   '/supplier/inventory': {

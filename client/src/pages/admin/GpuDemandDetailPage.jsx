@@ -7,7 +7,14 @@ import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/Spinner';
 import { useToast } from '../../components/ui/Toast';
 
-const Field = ({ label, value }) => (<div><dt className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">{label}</dt><dd className="text-sm">{value || '—'}</dd></div>);
+const Field = ({ label, value }) => (
+  <div>
+    <dt className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">{label}</dt>
+    <dd className="text-sm">{value || '—'}</dd>
+  </div>
+);
+
+const STATUS_VARIANT = { DRAFT: 'default', SUBMITTED: 'info', IN_REVIEW: 'warning', MATCHED: 'success', CLOSED: 'default' };
 
 export default function GpuDemandDetailPage() {
   const { id } = useParams();
@@ -24,7 +31,8 @@ export default function GpuDemandDetailPage() {
       api.get(`/admin/gpu-demands/${id}`),
       api.get('/admin/gpu-clusters?status=APPROVED'),
     ]).then(([d, c]) => {
-      setDemand(d.data);
+      const specs = d.data.specifications || {};
+      setDemand({ ...d.data, ...specs });
       setClusters(c.data.data || c.data);
       setSelected(d.data.matchedClusterIds?.map((m) => m._id || m) || []);
     }).catch(console.error).finally(() => setLoading(false));
@@ -49,32 +57,66 @@ export default function GpuDemandDetailPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">GPU Demand — {demand.customerName}</h1>
+        <div>
+          <h1 className="text-2xl font-bold">GPU Request — {demand.customer}</h1>
+          {demand.status && <Badge variant={STATUS_VARIANT[demand.status]} className="mt-1">{demand.status}</Badge>}
+        </div>
         <Button variant="ghost" onClick={() => navigate('/admin/gpu-demands')}>Back</Button>
       </div>
 
       <Card>
-        <h2 className="font-semibold mb-4">Demand Details</h2>
+        <h2 className="font-semibold mb-4">Client Identity</h2>
         <dl className="grid sm:grid-cols-3 gap-4">
-          <Field label="Customer" value={demand.customerName} />
-          <Field label="Country" value={demand.customerCountry} />
-          <Field label="Technology" value={demand.technologyType} />
-          <Field label="Cluster Size" value={demand.clusterSizeGpus} />
-          <Field label="Contract Length" value={demand.contractLengthYears} />
-          <Field label="Timeline" value={demand.timelineGoLive} />
-          <Field label="Target Price" value={demand.targetPriceGpuHr} />
-          <Field label="DC Tier Min" value={demand.dcTierMinimum} />
-          <Field label="Location Preference" value={demand.idealClusterLocation} />
+          <Field label="Customer" value={demand.customer} />
+          <Field label="Date of Entry" value={demand.dateOfEntry} />
+          <Field label="Customer Country" value={demand.customerCountry} />
         </dl>
       </Card>
 
       <Card>
-        <h2 className="font-semibold mb-4">Match with GPU Listings</h2>
-        <p className="text-sm text-gray-500 mb-4">Select approved GPU listings to match with this demand.</p>
+        <h2 className="font-semibold mb-4">Technical Requirements</h2>
+        <dl className="grid sm:grid-cols-3 gap-4">
+          <Field label="Type of Technology" value={demand.typeOfTechnology} />
+          <Field label="Cluster Size GPU #" value={demand.clusterSizeGpu} />
+          <Field label="DC Tier (minimum)" value={demand.dcTierMinimum} />
+          <Field label="Connectivity, Mbps" value={demand.connectivityMbps} />
+          <Field label="Latency, ms" value={demand.latencyMs} />
+          <Field label="Interconnectivity" value={demand.interconnectivity} />
+          <Field label="Redundancy / Uptime Requirements" value={demand.redundancyUptimeRequirements} />
+        </dl>
+      </Card>
+
+      <Card>
+        <h2 className="font-semibold mb-4">Deployment</h2>
+        <dl className="grid sm:grid-cols-3 gap-4">
+          <Field label="Contract Length, Years" value={demand.contractLengthYears} />
+          <Field label="Timeline for Go Live" value={demand.timelineForGoLive} />
+          <Field label="Ideal Cluster Location" value={demand.idealClusterLocation} />
+          <Field label="Export Constraints" value={demand.exportConstraints} />
+        </dl>
+      </Card>
+
+      <Card>
+        <h2 className="font-semibold mb-4">Commercial & CRM</h2>
+        <dl className="grid sm:grid-cols-3 gap-4">
+          <Field label="Target Price, GPU/h, USD" value={demand.targetPriceGpuHUsd} />
+          <Field label="Decision Maker" value={demand.decisionMaker} />
+          <Field label="Procurement Stage" value={demand.procurementStage} />
+          <Field label="Other Comments" value={demand.otherComments} />
+        </dl>
+      </Card>
+
+      <Card>
+        <h2 className="font-semibold mb-4">Match with GPU Capacity Listings</h2>
+        <p className="text-sm text-gray-500 mb-4">Select approved GPU capacity listings to match with this request.</p>
         <div className="space-y-2 max-h-64 overflow-y-auto">
           {clusters.map((c) => (
             <label key={c._id} className="flex items-center gap-3 p-3 border rounded cursor-pointer hover:bg-gray-50">
-              <input type="checkbox" checked={selected.includes(c._id)} onChange={() => setSelected((p) => p.includes(c._id) ? p.filter((x) => x !== c._id) : [...p, c._id])} />
+              <input
+                type="checkbox"
+                checked={selected.includes(c._id)}
+                onChange={() => setSelected((p) => p.includes(c._id) ? p.filter((x) => x !== c._id) : [...p, c._id])}
+              />
               <div>
                 <p className="text-sm font-medium">{c.vendorName} — {c.gpuTechnology}</p>
                 <p className="text-xs text-gray-500">{c.singleClusterSize} GPUs · {c.location}, {c.country}</p>

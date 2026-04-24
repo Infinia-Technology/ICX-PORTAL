@@ -199,7 +199,7 @@ export default function GpuClusterNewPage() {
         return;
       }
 
-      addToast({ type: 'success', message: 'GPU listing submitted successfully! Our team will review it shortly.' });
+      addToast({ type: 'success', message: 'GPU capacity listing submitted successfully! Our team will review it shortly.' });
       navigate(isAdmin ? '/admin/gpu-clusters' : '/supplier/gpu-clusters');
     } catch (err) {
       addToast({ type: 'error', message: err.response?.data?.error || 'Failed to submit' });
@@ -363,7 +363,7 @@ export default function GpuClusterNewPage() {
       );
       case 8: return (
         <div className="space-y-4">
-          <p className="text-gray-500">Review and submit your GPU listing.</p>
+          <p className="text-gray-500">Review and submit your GPU capacity listing.</p>
           <Card>
             <dl className="grid sm:grid-cols-2 gap-3 text-sm">
               <div><dt className="text-gray-400 text-xs">Vendor</dt><dd>{s1.vendorName}</dd></div>

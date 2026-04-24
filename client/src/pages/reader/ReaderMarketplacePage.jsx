@@ -53,7 +53,7 @@ export default function ReaderMarketplacePage() {
             <Building2 className="w-4 h-4 inline mr-2" />DC Listings ({dcListings.length})
           </button>
           <button onClick={() => setTab('gpu')} className={`px-4 py-2 text-sm font-medium ${tab === 'gpu' ? 'bg-[var(--color-primary)] text-white' : 'hover:bg-gray-50'}`}>
-            <Server className="w-4 h-4 inline mr-2" />GPU Listings ({gpuListings.length})
+            <Server className="w-4 h-4 inline mr-2" />GPU Capacity Listings ({gpuListings.length})
           </button>
         </div>
         <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />

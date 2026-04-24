@@ -117,7 +117,7 @@ export default function AnalyticsPage() {
         />
         <StatCard
           icon={Server}
-          label="GPU Listings (Approved)"
+          label="GPU Capacity Listings (Approved)"
           value={stats.approvedGpuClusters}
           color="text-green-500"
         />
@@ -212,7 +212,7 @@ export default function AnalyticsPage() {
               { label: 'Approved Customers', value: stats.totalCustomers },
               { label: 'Approved DC Listings', value: stats.approvedDcListings },
               { label: 'Pending DC Listings', value: stats.pendingDcListings },
-              { label: 'Approved GPU Listings', value: stats.approvedGpuClusters },
+              { label: 'Approved GPU Capacity Listings', value: stats.approvedGpuClusters },
               { label: 'Total Approved MW', value: `${stats.totalApprovedMw || 0} MW` },
               { label: 'GPU Requests', value: stats.totalGpuDemands },
               { label: 'DC Requests', value: stats.totalDcRequests },
