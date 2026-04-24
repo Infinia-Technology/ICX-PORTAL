@@ -29,8 +29,6 @@ import GpuClusterDetailPage from './pages/supplier/GpuClusterDetailPage';
 import GpuClusterEditPage from './pages/supplier/GpuClusterEditPage';
 import SupplierInventoryPage from './pages/supplier/InventoryPage';
 import TeamPage from './pages/supplier/TeamPage';
-import SupplierGpuDemandNewPage from './pages/supplier/GpuDemandNewPage';
-import SupplierGpuDemandsPage from './pages/supplier/GpuDemandsPage';
 import SupplierSettingsPage from './pages/supplier/SupplierSettingsPage';
 import KycWaitingPage from './pages/supplier/KycWaitingPage';
 
@@ -56,7 +54,6 @@ import AdminGpuClustersPage from './pages/admin/AdminGpuClustersPage';
 import GpuClusterReviewPage from './pages/admin/GpuClusterReviewPage';
 import AdminGpuDemandsPage from './pages/admin/AdminGpuDemandsPage';
 import GpuDemandDetailPage from './pages/admin/GpuDemandDetailPage';
-import AdminInventoryPage from './pages/admin/InventoryPage';
 import ReadersPage from './pages/admin/ReadersPage';
 import AuditLogPage from './pages/admin/AuditLogPage';
 import UsersPage from './pages/admin/UsersPage';
@@ -102,9 +99,6 @@ export default function App() {
               <Route path="/supplier/gpu-clusters/:id/edit" element={<GpuClusterEditPage />} />
               <Route path="/supplier/inventory" element={<SupplierInventoryPage />} />
               <Route path="/supplier/team" element={<TeamPage />} />
-              <Route path="/supplier/gpu-demands" element={<SupplierGpuDemandsPage />} />
-              <Route path="/supplier/gpu-demands/:id" element={<GpuDemandDetailPage />} />
-              <Route path="/supplier/gpu-demands/new" element={<SupplierGpuDemandNewPage />} />
               <Route path="/supplier/settings" element={<SupplierSettingsPage />} />
               <Route path="/supplier/kyc-waiting" element={<KycWaitingPage />} />
             </Route>
@@ -147,7 +141,7 @@ export default function App() {
               <Route path="/admin/gpu-clusters" element={<AdminGpuClustersPage />} />
               <Route path="/admin/gpu-clusters/new" element={<GpuClusterNewPage />} />
               <Route path="/admin/gpu-clusters/:id" element={<GpuClusterReviewPage />} />
-              <Route path="/admin/gpu-demands" element={<AdminInventoryPage />} />
+              <Route path="/admin/gpu-demands" element={<AdminGpuDemandsPage />} />
               <Route path="/admin/gpu-demands/:id" element={<GpuDemandDetailPage />} />
               <Route path="/admin/users" element={<UsersPage />} />
               <Route path="/admin/readers" element={<ReadersPage />} />

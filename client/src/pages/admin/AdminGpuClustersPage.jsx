@@ -60,8 +60,8 @@ export default function AdminGpuClustersPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">GPU Listings</h1>
-          <p className="text-[var(--color-text-secondary)] text-sm mt-1">All GPU listings</p>
+          <h1 className="text-2xl font-bold">GPU Capacity Listings</h1>
+          <p className="text-[var(--color-text-secondary)] text-sm mt-1">All GPU capacity listings</p>
         </div>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 text-sm">
@@ -76,7 +76,7 @@ export default function AdminGpuClustersPage() {
               ...['DRAFT', 'SUBMITTED', 'IN_REVIEW', 'RESUBMITTED', 'APPROVED', 'REJECTED', 'REVISION_REQUESTED'].map((s) => ({ value: s, label: s.replace(/_/g, ' ') })),
             ]}
           />
-          <Link to="/admin/gpu-clusters/new"><Button variant="primary">+ New GPU Listing</Button></Link>
+          <Link to="/admin/gpu-clusters/new"><Button variant="primary">+ New GPU Capacity Listing</Button></Link>
         </div>
       </div>
       {loading ? <div className="flex justify-center py-20"><Spinner size="lg" /></div> : <DataTable columns={columns} data={clusters} />}

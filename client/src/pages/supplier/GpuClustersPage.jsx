@@ -90,11 +90,11 @@ export default function GpuClustersPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">GPU Listings</h1>
-          <p className="text-[var(--color-text-secondary)] text-sm mt-1">Manage your GPU compute listings</p>
+          <h1 className="text-2xl font-bold">GPU Capacity Listings</h1>
+          <p className="text-[var(--color-text-secondary)] text-sm mt-1">Manage your GPU capacity listings</p>
         </div>
         <Link to="/supplier/gpu-clusters/new">
-          <Button leftIcon={<Plus className="w-4 h-4" />}>New GPU Listing</Button>
+          <Button leftIcon={<Plus className="w-4 h-4" />}>New GPU Capacity Listing</Button>
         </Link>
       </div>
 
@@ -104,7 +104,7 @@ export default function GpuClustersPage() {
           <h3 className="font-semibold text-lg mb-2">No GPU listings yet</h3>
           <p className="text-[var(--color-text-secondary)] mb-6">List your first GPU listing to get started</p>
           <Link to="/supplier/gpu-clusters/new">
-            <Button leftIcon={<Plus className="w-4 h-4" />}>Create GPU Listing</Button>
+            <Button leftIcon={<Plus className="w-4 h-4" />}>Create GPU Capacity Listing</Button>
           </Link>
         </Card>
       ) : (

@@ -19,7 +19,7 @@ export default function GpuClusterDetailPage() {
   }, [id]);
 
   if (loading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
-  if (!cluster) return <div className="text-center py-20">GPU listing not found</div>;
+  if (!cluster) return <div className="text-center py-20">GPU capacity listing not found</div>;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">

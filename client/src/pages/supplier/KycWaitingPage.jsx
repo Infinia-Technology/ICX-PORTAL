@@ -16,7 +16,7 @@ export default function KycWaitingPage() {
           Your profile has been submitted for review. Our team will be in touch once it has been verified.
         </p>
         <p className="text-sm text-[var(--color-text-secondary)] mb-6">
-          In the meantime, you can start filling in your listings — use the <strong>DC Listings</strong> or <strong>GPU Listings</strong> links in the sidebar.
+          In the meantime, you can start filling in your listings — use the <strong>DC Listings</strong> or <strong>GPU Capacity Listings</strong> links in the sidebar.
         </p>
         <div className="inline-block px-3 py-1 rounded-full bg-green-50 text-green-700 text-xs font-semibold mb-4">
           Submitted
@@ -32,7 +32,7 @@ export default function KycWaitingPage() {
           </Link>
           <Link to="/supplier/gpu-clusters">
             <Button variant="secondary" className="w-full">
-              Go to GPU Listings <ArrowRight className="w-4 h-4" />
+              Go to GPU Capacity Listings <ArrowRight className="w-4 h-4" />
             </Button>
           </Link>
         </div>

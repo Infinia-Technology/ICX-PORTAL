@@ -73,9 +73,9 @@ function SupplierAnalytics() {
         </div>
       </div>
 
-      {/* GPU Listings KPIs */}
+      {/* GPU Capacity Listings KPIs */}
       <div className="mb-3">
-        <h2 className="text-base font-semibold mb-3">GPU Listings</h2>
+        <h2 className="text-base font-semibold mb-3">GPU Capacity Listings</h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <StatCard icon={Server} label="Total" value={stats.totalGpuListings} color="text-purple-500" iconBg="bg-purple-50" />
           <StatCard icon={CheckCircle} label="Approved" value={stats.approvedGpuListings} color="text-green-500" iconBg="bg-green-50" />
@@ -118,7 +118,7 @@ function SupplierAnalytics() {
         <Card>
           <div className="flex items-center gap-2 mb-4">
             <BarChart2 className="w-4 h-4 text-[var(--color-text-secondary)]" />
-            <h3 className="font-semibold text-sm">GPU Listings</h3>
+            <h3 className="font-semibold text-sm">GPU Capacity Listings</h3>
           </div>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={gpuData} margin={{ top: 4, right: 8, left: -16, bottom: 4 }}>
@@ -203,7 +203,7 @@ export default function SupplierDashboard() {
           <Link to="/supplier/gpu-clusters">
             <Card elevated className="hover:border-[var(--color-primary)] transition-colors cursor-pointer">
               <Server className="w-8 h-8 text-[var(--color-success)] mb-3" />
-              <h3 className="font-semibold">GPU Listings</h3>
+              <h3 className="font-semibold">GPU Capacity Listings</h3>
               <p className="text-sm text-[var(--color-text-secondary)] mt-1">Manage GPU compute listings</p>
             </Card>
           </Link>

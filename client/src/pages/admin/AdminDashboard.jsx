@@ -42,7 +42,7 @@ export default function AdminDashboard() {
         <h1 className="text-2xl font-bold mb-2">Admin Dashboard</h1>
         <Card className="bg-blue-50 border-blue-200">
           <p className="text-sm text-blue-900">
-            <strong>How to add new listings:</strong> Navigate to <strong>DC Listings</strong> or <strong>GPU Listings</strong> in the sidebar to review supplier submissions. Suppliers create and submit their own listings for your approval.
+            <strong>How to add new listings:</strong> Navigate to <strong>DC Listings</strong> or <strong>GPU Capacity Listings</strong> in the sidebar to review supplier submissions. Suppliers create and submit their own listings for your approval.
           </p>
         </Card>
       </div>
@@ -58,7 +58,7 @@ export default function AdminDashboard() {
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatCard icon={Building2} label="DC Listings (Approved)" value={stats?.approvedDcListings} color="text-[var(--color-info)]" to="/admin/dc-listings" />
         <StatCard icon={Clock} label="DC Listings (Pending)" value={stats?.pendingDcListings} color="text-yellow-500" to="/admin/dc-listings" />
-        <StatCard icon={Server} label="GPU Listings (Approved)" value={stats?.approvedGpuClusters} color="text-[var(--color-success)]" to="/admin/gpu-clusters" />
+        <StatCard icon={Server} label="GPU Capacity Listings (Approved)" value={stats?.approvedGpuClusters} color="text-[var(--color-success)]" to="/admin/gpu-clusters" />
         <StatCard icon={Zap} label="GPU Requests" value={stats?.totalGpuDemands} color="text-orange-500" to="/admin/gpu-demands" />
       </div>
 

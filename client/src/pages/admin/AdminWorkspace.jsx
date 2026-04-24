@@ -117,7 +117,7 @@ export default function AdminWorkspace() {
     { label: 'Approved Customers', value: stats?.totalCustomers },
     { label: 'Approved DC Listings', value: stats?.approvedDcListings },
     { label: 'Pending DC Listings', value: stats?.pendingDcListings },
-    { label: 'Approved GPU Listings', value: stats?.approvedGpuClusters },
+    { label: 'Approved GPU Capacity Listings', value: stats?.approvedGpuClusters },
     { label: 'Total Approved MW', value: `${stats?.totalApprovedMw || 0} MW` },
     { label: 'GPU Requests', value: stats?.totalGpuDemands },
     { label: 'DC Requests', value: stats?.totalDcRequests },
@@ -169,7 +169,7 @@ export default function AdminWorkspace() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
             <MetricCard icon={CheckCircle} label="DC Listings (Approved)" value={stats?.approvedDcListings} color="text-blue-500" iconBg="bg-blue-50" to="/admin/dc-listings" />
             <MetricCard icon={Clock} label="DC Listings (Pending)" value={stats?.pendingDcListings} color="text-yellow-500" iconBg="bg-yellow-50" to="/admin/dc-listings" />
-            <MetricCard icon={Server} label="GPU Listings (Approved)" value={stats?.approvedGpuClusters} color="text-green-500" iconBg="bg-green-50" to="/admin/gpu-clusters" />
+            <MetricCard icon={Server} label="GPU Capacity Listings (Approved)" value={stats?.approvedGpuClusters} color="text-green-500" iconBg="bg-green-50" to="/admin/gpu-clusters" />
             <MetricCard icon={Zap} label="GPU Requests" value={stats?.totalGpuDemands} color="text-orange-500" iconBg="bg-orange-50" to="/admin/gpu-demands" />
           </div>
 
@@ -202,7 +202,7 @@ export default function AdminWorkspace() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
             <MetricCard icon={CheckCircle} label="DC Listings (Approved)" value={stats?.approvedDcListings} color="text-blue-500" iconBg="bg-blue-50" />
             <MetricCard icon={Clock} label="DC Listings (Pending)" value={stats?.pendingDcListings} color="text-yellow-500" iconBg="bg-yellow-50" />
-            <MetricCard icon={Server} label="GPU Listings (Approved)" value={stats?.approvedGpuClusters} color="text-green-500" iconBg="bg-green-50" />
+            <MetricCard icon={Server} label="GPU Capacity Listings (Approved)" value={stats?.approvedGpuClusters} color="text-green-500" iconBg="bg-green-50" />
             <MetricCard icon={Zap} label="GPU Requests" value={stats?.totalGpuDemands} color="text-orange-500" iconBg="bg-orange-50" />
           </div>
 
